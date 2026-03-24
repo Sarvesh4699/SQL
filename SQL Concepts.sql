@@ -538,8 +538,109 @@ ORDER BY OrderID ASC
 it can break your query or can make the result set incorrect, and also it is a good practice to list the needed columns instead of using an asterisk (*) */
 
 
+--*-------------------
+-- * STRING FUNCTIONS
+--*-------------------
+
+-- Nested functions --> Using one function inside another function
+-- CONCAT --> Used to concatenate two or more strings into one string
+SELECT * from SalesDB.Sales.Employees
+SELECT CONCAT(FirstName, ' ', LastName) AS FullName from SalesDB.Sales.Employees
+-- We are concatenating first name and last name with a space in between and giving an alias "FullName" to the concatenated result
+-- We can also use the "+" operator to concatenate strings in SQL Server
+SELECT FirstName + ' ' + LastName AS FullName from SalesDB.Sales.Employees
+-- Both CONCAT and "+" operator will give us the same result, but CONCAT is more flexible because it can handle NULL values without throwing an error, while the "+" operator will return NULL if any of the operands is NULL
+
+-- UPPER --> Converts a string to uppercase
+SELECT UPPER(FirstName) AS UpperFirstName from SalesDB.Sales.Employees
+
+-- LOWER --> Converts a string to lowercase
+SELECT LOWER(FirstName) AS LowerFirstName from SalesDB.Sales.Employees
+
+-- LEN --> Returns the length of a string
+SELECT LEN(FirstName) AS FirstNameLength from SalesDB.Sales.Employees
+
+-- SUBSTRING --> Extracts a portion of a string based on a specified starting position and length
+SELECT SUBSTRING(FirstName, 1, 3) AS SubstringFirstName from SalesDB.Sales.Employees
+-- This will give us the first 3 characters of the first name, starting from position 1 (1-based index) and length of 3 characters
+
+-- REPLACE --> Replaces all occurrences of a specified string with another string
+SELECT REPLACE(FirstName, 'a', 'x') AS ReplacedFirstName from SalesDB.Sales.Employees
+-- This will replace all occurrences of the character 'a' with 'x' in the first name
+
+-- TRIM --> Removes leading and trailing spaces from a string
+SELECT TRIM(FirstName) AS TrimmedFirstName from SalesDB.Sales.Employees
+-- This will remove any leading and trailing spaces from the first name
+
+-- LTRIM --> Removes leading spaces from a string
+SELECT LTRIM(FirstName) AS LeftTrimmedFirstName from SalesDB.Sales.Employees
+-- This will remove any leading spaces from the first name
+
+-- RTRIM --> Removes trailing spaces from a string
+SELECT RTRIM(FirstName) AS RightTrimmedFirstName from SalesDB.Sales.Employees
+-- This will remove any trailing spaces from the first name
+
+-- CHARINDEX --> Returns the starting position of a specified substring within a string
+SELECT CHARINDEX('a', FirstName) AS PositionOfA from SalesDB.Sales.Employees
+-- This will give us the starting position of the character 'a' in the first name, if 'a' is not present in the first name then it will return 0
+-- Note: The availability of string functions may vary depending on the database management system (DBMS) you are using, so it's always a good idea to check the documentation for your specific DBMS to see which string functions are supported and how they work
+-- Also, the syntax and behavior of string functions can differ between DBMSs, so it's important to understand how they work in your specific environment to use them effectively in your SQL queries
+
+--! Question: Find out if there are any leading or trailing spaces in the first name of employees
+SELECT FirstName,
+CASE WHEN LEN(FirstName) > LEN(TRIM(FirstName)) THEN 'Yes' ELSE 'No' END AS HasLeadingOrTrailingSpaces
+FROM SalesDB.Sales.Employees
+
+SELECT * from SalesDB.Sales.Employees
+
+UPDATE SalesDB.Sales.Employees
+SET FirstName = ' ' + FirstName + ' ' -- Adding a space at the end of the first name to demonstrate the use of TRIM function
+WHERE EmployeeID IN (2,5)
 
 
+
+--*-----------------------
+-- * AGGREGATE FUNCTIONS
+--*-----------------------
+
+SELECT CustomerID,
+COUNT(*) AS total_nr_orders,
+SUM(sales) AS total_sales,
+AVG(Sales) AS average_sales,
+MAX(Sales) AS max_sales,
+MIN(Sales) AS min_sales
+FROM SalesDB.Sales.Orders
+GROUP BY CustomerID;
+
+-- Find the customer with the highest average sales per order
+WITH CTE AS (
+SELECT CustomerID,
+AVG(Sales) AS average_sales
+FROM SalesDB.Sales.Orders
+GROUP BY CustomerID)
+SELECT CustomerID, average_sales AS max_average_sales
+FROM CTE
+WHERE average_sales = (SELECT MAX(average_sales) FROM CTE)
+
+
+SELECT * FROM SalesDB.Sales.Orders
+
+SELECT 
+ProductID,
+SUM(Sales) OVER(PARTITION BY ProductID) AS total_sales_per_product
+FROM SalesDB.Sales.Orders;
+
+
+WITH CTE AS (
+SELECT 
+ProductID, SUM(Sales) AS total_sales
+FROM SalesDB.Sales.Orders
+GROUP BY ProductID
+)
+SELECT 
+ProductID, total_sales,
+RANK() OVER(ORDER BY total_sales DESC) AS sales_rank
+FROM CTE
 
 
 
