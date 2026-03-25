@@ -543,7 +543,7 @@ it can break your query or can make the result set incorrect, and also it is a g
 --*-------------------
 
 -- Nested functions --> Using one function inside another function
--- CONCAT --> Used to concatenate two or more strings into one string
+--* CONCAT --> Used to concatenate two or more strings into one string
 SELECT * from SalesDB.Sales.Employees
 SELECT CONCAT(FirstName, ' ', LastName) AS FullName from SalesDB.Sales.Employees
 -- We are concatenating first name and last name with a space in between and giving an alias "FullName" to the concatenated result
@@ -551,40 +551,62 @@ SELECT CONCAT(FirstName, ' ', LastName) AS FullName from SalesDB.Sales.Employees
 SELECT FirstName + ' ' + LastName AS FullName from SalesDB.Sales.Employees
 -- Both CONCAT and "+" operator will give us the same result, but CONCAT is more flexible because it can handle NULL values without throwing an error, while the "+" operator will return NULL if any of the operands is NULL
 
--- UPPER --> Converts a string to uppercase
+--* UPPER --> Converts a string to uppercase
 SELECT UPPER(FirstName) AS UpperFirstName from SalesDB.Sales.Employees
 
--- LOWER --> Converts a string to lowercase
+--* LOWER --> Converts a string to lowercase
 SELECT LOWER(FirstName) AS LowerFirstName from SalesDB.Sales.Employees
 
--- LEN --> Returns the length of a string
+--* LEN --> Returns the length of a string
 SELECT LEN(FirstName) AS FirstNameLength from SalesDB.Sales.Employees
 
--- SUBSTRING --> Extracts a portion of a string based on a specified starting position and length
-SELECT SUBSTRING(FirstName, 1, 3) AS SubstringFirstName from SalesDB.Sales.Employees
--- This will give us the first 3 characters of the first name, starting from position 1 (1-based index) and length of 3 characters
+--* SUBSTRING --> Extracts a portion of a string based on a specified starting position and length
+-- SUBSTRING(string, start_position, length)
+SELECT SUBSTRING(FirstName, 2, 3) AS SubstringFirstName from SalesDB.Sales.Employees
+-- This will give us the 3 characters of the first name, starting from position 2 and length of 3 characters
 
--- REPLACE --> Replaces all occurrences of a specified string with another string
+--! Question: Retrieve a list of customers' first names after removing the first two characters
+SELECT SUBSTRING(TRIM(FirstName), 3, LEN(TRIM(FirstName)) - 2) AS FirstNameWithoutFirstChar from SalesDB.Sales.Employees
+
+--* REPLACE --> Replaces all occurrences of a specified string with another string
 SELECT REPLACE(FirstName, 'a', 'x') AS ReplacedFirstName from SalesDB.Sales.Employees
 -- This will replace all occurrences of the character 'a' with 'x' in the first name
 
--- TRIM --> Removes leading and trailing spaces from a string
+--* TRIM --> Removes leading and trailing spaces from a string
 SELECT TRIM(FirstName) AS TrimmedFirstName from SalesDB.Sales.Employees
 -- This will remove any leading and trailing spaces from the first name
 
--- LTRIM --> Removes leading spaces from a string
+--* LTRIM --> Removes leading spaces from a string
 SELECT LTRIM(FirstName) AS LeftTrimmedFirstName from SalesDB.Sales.Employees
 -- This will remove any leading spaces from the first name
 
--- RTRIM --> Removes trailing spaces from a string
+--* RTRIM --> Removes trailing spaces from a string
 SELECT RTRIM(FirstName) AS RightTrimmedFirstName from SalesDB.Sales.Employees
 -- This will remove any trailing spaces from the first name
 
--- CHARINDEX --> Returns the starting position of a specified substring within a string
+--* LEFT --> Returns the leftmost characters from a string based on a specified number of characters
+SELECT LEFT(TRIM(FirstName), 3) AS LeftFirstName from SalesDB.Sales.Employees
+-- This will give us the leftmost 3 characters of the first name
+
+--* RIGHT --> Returns the rightmost characters from a string based on a specified number of characters
+SELECT RIGHT(FirstName, 3) AS RightFirstName from SalesDB.Sales.Employees
+-- This will give us the rightmost 3 characters of the first name
+
+--* CHARINDEX --> Returns the starting position of a specified substring within a string
 SELECT CHARINDEX('a', FirstName) AS PositionOfA from SalesDB.Sales.Employees
 -- This will give us the starting position of the character 'a' in the first name, if 'a' is not present in the first name then it will return 0
 -- Note: The availability of string functions may vary depending on the database management system (DBMS) you are using, so it's always a good idea to check the documentation for your specific DBMS to see which string functions are supported and how they work
 -- Also, the syntax and behavior of string functions can differ between DBMSs, so it's important to understand how they work in your specific environment to use them effectively in your SQL queries
+
+SELECT CHARINDEX('t', 'Customer') AS MatchPosition
+-- This will return the starting position of the substring 't' in the string 'Customer', which is 4 because 't' is the 4th character in 'Customer'
+-- In SQL the indexing starts from 1, so the first character is at position 1, the second character is at position 2 and so on
+
+SELECT CHARINDEX('OM', 'Customer') AS MatchPosition;
+-- It is not case sensitive and it will return the starting position of the substring 'OM' in the string 'Customer'
+
+SELECT CHARINDEX('mer', 'Customer', 3) AS MatchPosition;
+-- Search for "mer" in string "Customer", and return position (start in position 3)
 
 --! Question: Find out if there are any leading or trailing spaces in the first name of employees
 SELECT FirstName,
@@ -598,6 +620,75 @@ SET FirstName = ' ' + FirstName + ' ' -- Adding a space at the end of the first 
 WHERE EmployeeID IN (2,5)
 
 
+--*-------------------
+-- * NUMBER FUNCTIONS
+--*-------------------
+
+--* ROUND --> Rounds a number to a specified number of decimal places
+SELECT 
+3.1415926536 AS OriginalNumber, 
+ROUND(3.1415926536, 2) AS RoundedNumber_2, 
+ROUND(3.1415926536, 4) AS RoundedNumber_4
+-- This will round the sales to 2 decimal places
+
+--* ABS --> Returns the absolute value of a number
+SELECT 
+-10.213 AS OriginalNumber, 
+ABS(-10.213) AS AbsoluteValue
+-- This will return the absolute value of -10.213 which is 10.213
+
+--*-------------------
+-- * NULL FUNCTIONS
+--*-------------------
+
+-- What is NULL?
+-- NULL represents the absence of a value or an unknown value in a database. It is not the same as zero or an empty string or a blank space; it indicates that the value is missing or not applicable.
+
+-- IS NULL --> Checks if a value is NULL
+SELECT * FROM MyDatabase.dbo.customers
+WHERE country IS NULL
+
+--* ISNULL --> Replaces NULL with a specified replacement value
+SELECT first_name, ISNULL(country, 'Unknown') AS Country from MyDatabase.dbo.customers
+-- This will replace any NULL values in the country column with 'Unknown'
+
+/* There is difference between IS NULL and ISNULL, IS NULL is used to check if a value is NULL and it returns a boolean value (TRUE or FALSE), 
+while ISNULL is used to replace NULL values with a specified replacement value and it returns the replacement value if the original value is NULL, 
+otherwise it returns the original value */
+
+--* COALESCE --> Returns the first non-NULL value from a list of expressions
+SELECT first_name, COALESCE(country, 'Unknown') AS Country from MyDatabase.dbo.customers
+-- This will return the first non-NULL value from the list of expressions, in this case it will return the country if it is not NULL, otherwise it will return 'Unknown'
+-- COALESCE is more flexible than ISNULL because it can take multiple arguments and return the first non-NULL value among them, while ISNULL can only take two arguments (the value to check and the replacement value)
+-- Use ISNULL when you want to replace NULL values with a specific value and use COALESCE when you want to return the first non-NULL value from a list of expressions
+
+-- ISNULL is specific to SQL Server, while COALESCE is a standard SQL function that is supported by most database management systems (DBMSs). Therefore, if you are writing SQL code that needs to be portable across different DBMSs, it is generally recommended to use COALESCE instead of ISNULL.
+/* ISNULL is faster than COALESCE because it is a built-in function in SQL Server and it is optimized for performance, while COALESCE is a more general function that can take multiple arguments and return the first non-NULL value among them, 
+which can make it slower in some cases. However, the performance difference between ISNULL and COALESCE is usually negligible for most use cases, so it's more important to choose the function that best fits your needs in terms of functionality 
+and portability rather than performance */
+-- ISNULL is limited to two arguments, while COALESCE can take multiple arguments and return the first non-NULL value among them. This makes COALESCE more flexible than ISNULL, as it can handle more complex scenarios where you need to check multiple values for NULL and return the first non-NULL value.
+
+
+-- Let's say we have values 10,25,NULL, and then we want to do data aggregation on these values
+--! NOTE: Now if we do the AVG() of these values, then SQL will do 10+25 and then divide by 2 and it will ignore the NULL value
+-- Same thing will happend if we do SUM(), MIN(), MAX() and COUNT() functions, they will ignore the NULL values
+--! NOTE: Only one expection of the aggregate functions is COUNT(*) function, it will count all the rows including the NULL values, but if we do COUNT(column_name) then it will count only the non-NULL values in that column
+
+-- If we do not want the NULL values to be ignored in the aggregation, then we can use ISNULL or COALESCE function to replace the NULL values with a specific value before doing the aggregation
+SELECT id, score,
+COALESCE(score,0) AS ScoreWithNullReplaced,
+AVG(score) OVER()AS AverageScore1, -- Ignoring the NULL values in the score column and calculating the average score
+AVG(COALESCE(score, 0)) OVER() AS AverageScore2 -- Considering the NULL values as 0 in the score column and calculating the average score
+from MyDatabase.dbo.customers
+
+
+-- If we do 1+5 it will give us 6, but if we do 1+NULL then it will give us NULL because any arithmetic operation with NULL will result in NULL
+-- If we do "A"+"B" it will give us "AB", but if we do "A"+NULL then it will give us NULL because any string concatenation with NULL will result in NULL
+
+--! Question: Display the full name of customers in a single field by merging their first and last names, and add 10 bonus points to each customer's score.
+SELECT COALESCE(FirstName,'') + ' ' + COALESCE(LastName,'') AS FullName,
+COALESCE(Score,0) + 10 AS BonusScore
+from SalesDB.Sales.Customers
 
 --*-----------------------
 -- * AGGREGATE FUNCTIONS
