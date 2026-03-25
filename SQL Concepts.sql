@@ -668,7 +668,7 @@ which can make it slower in some cases. However, the performance difference betw
 and portability rather than performance */
 -- ISNULL is limited to two arguments, while COALESCE can take multiple arguments and return the first non-NULL value among them. This makes COALESCE more flexible than ISNULL, as it can handle more complex scenarios where you need to check multiple values for NULL and return the first non-NULL value.
 
-
+--? Handling NULL values in data aggregation
 -- Let's say we have values 10,25,NULL, and then we want to do data aggregation on these values
 --! NOTE: Now if we do the AVG() of these values, then SQL will do 10+25 and then divide by 2 and it will ignore the NULL value
 -- Same thing will happend if we do SUM(), MIN(), MAX() and COUNT() functions, they will ignore the NULL values
@@ -681,14 +681,109 @@ AVG(score) OVER()AS AverageScore1, -- Ignoring the NULL values in the score colu
 AVG(COALESCE(score, 0)) OVER() AS AverageScore2 -- Considering the NULL values as 0 in the score column and calculating the average score
 from MyDatabase.dbo.customers
 
-
+--? Handlind NULL values in string concatenation and arithmetic operations
 -- If we do 1+5 it will give us 6, but if we do 1+NULL then it will give us NULL because any arithmetic operation with NULL will result in NULL
 -- If we do "A"+"B" it will give us "AB", but if we do "A"+NULL then it will give us NULL because any string concatenation with NULL will result in NULL
 
 --! Question: Display the full name of customers in a single field by merging their first and last names, and add 10 bonus points to each customer's score.
-SELECT COALESCE(FirstName,'') + ' ' + COALESCE(LastName,'') AS FullName,
-COALESCE(Score,0) + 10 AS BonusScore
+SELECT 
+COALESCE(FirstName,'') + ' ' + COALESCE(LastName,'') AS FullName,
+COALESCE(Score,0) + 10 AS NewTotalScore
 from SalesDB.Sales.Customers
+
+SELECT CONCAT(FirstName, ' ', LastName) AS FullName,
+ISNULL(Score, 0) + 10 AS NewTotalScore
+FROM SalesDB.Sales.Customers
+
+
+--? Handling NULL values in JOIN conditions
+-- When we are joining two tables based on a column that can have NULL values, we need to handle the NULL values properly in the JOIN condition, otherwise we may not get the correct results because NULL values do not match with any value including other NULL values
+/*
+SELECT
+a. year, a.type, a.orders, b.sales
+FROM Tablel a
+JOIN Table2 b
+ON
+a.year = b.year
+AND ISNULL (a.type, '') = ISNULL (b.type, '')
+
+-- In the above query we are joining two tables based on the year column and type column, 
+but since there can be NULL values in the type column, we are using ISNULL function to replace the NULL values with an empty string before comparing them, so that we can get the correct join results even when there are NULL values in the type column
+*/
+
+--? Handling NULL values in SORTING Data
+-- If we have three values 25,NULL,15 then if we sort these values in ascending order then the result will be NULL,15,25 because NULL values are considered to be the lowest possible values in SQL and they will be sorted before any non-NULL values when sorting in ascending order
+-- If we sort the same values in descending order then the result will be 25,15,NULL because NULL values are considered to be the lowest possible values in SQL and they will be sorted after any non-NULL values when sorting in descending order
+
+SELECT
+CustomerID, score,
+CASE WHEN Score IS NULL THEN 1 ELSE 0 END AS Flag
+FROM SalesDB.Sales.Customers
+ORDER BY CASE WHEN Score IS NULL THEN 1 ELSE 0 END, Score
+-- In the above query we are sorting the customers based on their scores, but since there can be NULL values in the score column, we are using a CASE statement to create a flag that indicates whether the score is NULL or not, and then we are sorting first by the flag (so that NULL values come last) and then by the score itself
+
+
+--* NULLIF --> Compares two expressions and returns NULL if they are equal, otherwise it returns the first expression
+SELECT NULLIF(10, 10) AS Result1, -- This will return NULL because the two expressions are equal
+NULLIF(10, 5) AS Result2 -- This will return 10 because the two expressions are not equal, so it returns the first expression which is 10
+-- NULLIF can be useful in scenarios where you want to avoid division by zero errors or to handle specific cases in your calculations by returning NULL when certain conditions are met
+
+-- Find the sales price for each order by dividing sales by quantity
+SELECT
+OrderID, sales,
+Quantity,
+Sales / NULLIF (Quantity, 0) AS Price
+FROM SalesDB.Sales.Orders
+
+-- NULL Vs Empty String Vs Blank Space
+-- NULL represents the absence of a value or an unknown value in a database, it indicates that the value is missing or not applicable
+-- An empty string ('') is a string that has zero characters, it is a valid value that can be stored in a database and it represents a known value that is intentionally left blank
+-- A blank space (' ') is a string that contains one or more space characters, it is also a valid value that can be stored in a database and it represents a known value that consists of spaces
+
+WITH CTE1 AS (
+SELECT 1 AS Id, 'A' AS Category 
+UNION 
+SELECT 2, NULL 
+UNION 
+SELECT 3, ''
+UNION
+SELECT 4, '  '
+)
+SELECT Id, Category,
+DATALENGTH(Category) AS CategoryLen
+FROM CTE1
+-- In the above query we are creating a Common Table Expression (CTE) with four rows, where the Category column has different types of values including a non-empty string ('A'), a NULL value, an empty string (''), and a blank space (' ')
+-- When we calculate the length of the Category column using the DATALENGTH function, we can see that the non-empty string has a length of 1, the NULL value has a length of NULL, the empty string has a length of 0, and the blank space has a length of 1 because it contains one space character
+-- Performace is best for NULL values, then empty string and then blank space because blank space takes more storage than empty string and empty string takes more storage than NULL value
+-- To compare we use IS NULL for NULL values, = '' for empty strings and = ' ' for blank spaces
+
+--* DATA Policies for handling NULL values, empty strings and blank spaces
+-- Set of rules that defines how data should be handled
+-- #1 DATA POLICY Only use NULLs and empty strings, but avoid blank spaces
+-- #2 DATA POLICY Only use NULLS and avoid using empty strings and blank spaces
+-- #3 DATA POLICY Use the default value 'unknown' and avoid using nulls, empty strings, and blank spaces
+
+WITH CTE2 AS (
+SELECT 1 AS Id, 'A' AS Category 
+UNION 
+SELECT 2, NULL 
+UNION 
+SELECT 3, ''
+UNION
+SELECT 4, '  '
+)
+SELECT
+*,
+TRIM(Category) AS Policy1,
+NULLIF(TRIM(Category), '') AS Policy2,
+COALESCE(NULLIF(TRIM(Category), ''), 'unknown') AS Policy3
+FROM CTE2
+-- In the above query we are using the TRIM function to remove any leading or trailing spaces from the Category column, and then we are using NULLIF to return NULL if the trimmed category is an empty string, and then we are using COALESCE to return 'unknown' if the result of NULLIF is NULL, which means that the original category was either NULL or an empty string after trimming
+-- This way we can handle all three cases (NULL values, empty strings, and blank spaces) in a consistent manner by treating them as unknown categories in our analysis or reporting
+-- The choice of how to handle NULL values, empty strings, and blank spaces in your data depends on the specific requirements of your analysis or reporting, as well as the conventions and standards of your organization. It's important to have a clear data policy for handling these cases to ensure consistency and accuracy in your results.
+--! Data Policy --> Use case Replacing empty strings and blanks with NULL during data preparation before inserting into a database to optimize storage and performance
+--! Data Policy --> Use case Replacing empty strings, blanks, NULL with default value during data preparation before using it in reporting to improve readiblity and reduce confusion
+
 
 --*-----------------------
 -- * AGGREGATE FUNCTIONS
@@ -732,6 +827,7 @@ SELECT
 ProductID, total_sales,
 RANK() OVER(ORDER BY total_sales DESC) AS sales_rank
 FROM CTE
+
 
 
 
