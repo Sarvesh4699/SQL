@@ -788,7 +788,7 @@ FROM CTE2
 --*-----------------------
 -- * AGGREGATE FUNCTIONS
 --*-----------------------
-
+ 
 SELECT CustomerID,
 COUNT(*) AS total_nr_orders,
 SUM(sales) AS total_sales,
