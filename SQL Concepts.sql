@@ -3,7 +3,6 @@
 -- ?
 -- TODO
 
-
 SELECT * from MyDatabase.dbo.customers
 
 --*-----------
