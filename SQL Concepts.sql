@@ -794,7 +794,6 @@ FROM CTE2
 /* Create report showing total sales for each of the following categories: High (sales over 50), Medium (sales 21-50), and Low (sales 20 or less)
 Sort the categories from highest sales to lowest */
 
-
 SELECT
 Category,
 SUM(Sales) AS TotalSales
@@ -810,6 +809,7 @@ FROM (
 FROM SalesDB.Sales.Orders
 ) AS t
 GROUP BY Category
+ORDER BY TotalSales DESC
 
 
 
