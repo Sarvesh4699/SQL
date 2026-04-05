@@ -791,6 +791,9 @@ FROM CTE2
 -- Order of conditions is important in CASE WHEN statement because SQL evaluates the conditions in the order they are written and returns the result of the first condition that is true, so if you have multiple conditions that can be true for a given row, only the result of the first true condition will be returned.
 -- If none fo the conditions are true, then the ELSE part will be executed and it will return the value specified in the ELSE clause. If there is no ELSE clause and none of the conditions are true, then it will return NULL.
 
+-- Evalutates a list of conditions and returns a value when first condition is met (like an IF-THEN-ELSE statement)
+-- The datatype of the results must be matching in all conditions and the ELSE part, otherwise it will throw an error
+
 /* Create report showing total sales for each of the following categories: High (sales over 50), Medium (sales 21-50), and Low (sales 20 or less)
 Sort the categories from highest sales to lowest */
 
@@ -810,9 +813,80 @@ FROM SalesDB.Sales.Orders
 ) AS t
 GROUP BY Category
 ORDER BY TotalSales DESC
+-- CASE statement can be used anywhere in the query, such as in the SELECT clause, WHERE clause, ORDER BY clause, etc. It is a powerful tool for performing conditional logic and categorization in SQL queries.
+
+-- Retrieve employee details with gender displayed as full text
+SELECT 
+EmployeeID, 
+FirstName, 
+LastName, 
+CASE
+    WHEN Gender = 'M' THEN 'Male'
+    WHEN Gender = 'F' THEN 'Female'
+    ELSE 'Not Available'
+    END AS GenderFullText
+FROM SalesDB.Sales.Employees
+
+-- FULL FORM
+/*CASE
+    WHEN Country = 'Germany' THEN 'DE'
+    WHEN Country = 'India' THEN 'IN'
+    WHEN Country = 'United States' THEN 'US'
+    WHEN Country = 'France' THEN 'FR'
+    WHEN Country = 'Italy' THEN 'IT'
+    ELSE 'n/a'
+END */
+
+-- QUICK FORM
+/* CASE Country -- Only one column can be used in the CASE statement when using the quick form
+    WHEN 'Germany' THEN 'DE'
+    WHEN 'India' THEN'IN'
+    WHEN 'United States' THEN 'US'
+    WHEN 'France' THEN 'FR'
+    WHEN 'Italy' THEN 'IT'
+    ELSE 'n/a'
+END */
+
+-- Find the average scores of customers and treat Nulls as 0. Additionally provide details such CustomerID and LastName
+SELECT
+CustomerID, LastName, score,
+AVG (Score) OVER () AvgCustomer,
+CASE 
+    WHEN Score IS NULL THEN 0
+    ELSE Score
+END ScoreClean,
+AVG (CASE
+        WHEN Score IS NULL THEN 0
+        ELSE Score
+    END) OVER () AvgCustomerClean
+FROM SalesDB.Sales.Customers
+
+-- Count how many times each customer has made an order with sales greater than 30
+SELECT CustomerID, COUNT(*) AS order_count
+FROM SalesDB.Sales.Orders
+WHERE Sales > 30
+GROUP BY CustomerID
+ORDER BY order_count DESC
+
+SELECT
+CustomerID, 
+SUM (CASE
+        WHEN Sales > 30 THEN 1
+        ELSE 0
+    END) TotalOrdersHighSales,
+COUNT (*) TotalOrders
+FROM SalesDB.Sales.Orders
+GROUP BY CustomerID
 
 
+--*-----------------------
+-- * WINDOW FUNCTIONS
+--*-----------------------
 
+-- What is data aggregation?
+/* Data aggregation is the process of summarizing and combining data from multiple records or rows into a single value or summary. It is commonly used in data analysis and reporting to derive insights and trends from large datasets. 
+Aggregation can involve various operations such as counting, summing, averaging, finding minimum or maximum values, and more. The purpose of data aggregation is to provide a concise and meaningful representation of the underlying data, 
+making it easier to understand and analyze patterns, trends, and relationships within the dataset */
 
 --*-----------------------
 -- * AGGREGATE FUNCTIONS
@@ -827,37 +901,53 @@ MIN(Sales) AS min_sales
 FROM SalesDB.Sales.Orders
 GROUP BY CustomerID;
 
--- Find the customer with the highest average sales per order
-WITH CTE AS (
-SELECT CustomerID,
-AVG(Sales) AS average_sales
+
+--*-----------------------
+-- * WINDOW FUNCTIONS
+--*-----------------------
+-- WINDOW FUNCTIONS are also known as ANALYTICAL FUNCTIONS or OLAP (ONLINE ANALYTICAL PROCESSING) FUNCTIONS
+-- Perform calculations (e.g. aggregation) on a specific subset of data, without losing the level of details of rows
+
+-- GORUP BY does simple aggregation and it reduces the level of details of rows, while WINDOW FUNCTIONS perform calculations on a specific subset of data, without losing the level of details of rows
+-- WINDOW FUNCTIONS are used with the OVER() clause, which defines the window or subset of data that the function should operate on. The OVER() clause can include PARTITION BY and ORDER BY clauses to further define the window of data for the function to operate on
+
+-- Find the total sales across all orders
+SELECT
+OrderID, OrderDate, ProductID, 
+SUM(Sales) OVER() AS total_sales
 FROM SalesDB.Sales.Orders
-GROUP BY CustomerID)
-SELECT CustomerID, average_sales AS max_average_sales
-FROM CTE
-WHERE average_sales = (SELECT MAX(average_sales) FROM CTE)
 
-
-SELECT * FROM SalesDB.Sales.Orders
-
-SELECT 
-ProductID,
-SUM(Sales) OVER(PARTITION BY ProductID) AS total_sales_per_product
-FROM SalesDB.Sales.Orders;
-
-
-WITH CTE AS (
-SELECT 
-ProductID, SUM(Sales) AS total_sales
+-- Find the total sales for each product across all orders
+SELECT
+OrderID, OrderDate, ProductID, 
+SUM(Sales) OVER(PARTITION BY ProductID) AS total_sales
 FROM SalesDB.Sales.Orders
-GROUP BY ProductID
-)
-SELECT 
-ProductID, total_sales,
-RANK() OVER(ORDER BY total_sales DESC) AS sales_rank
-FROM CTE
 
+-- Syntax of window functions
+/* 
+First part is WINDOW FUNCTION, then we have the OVER() clause which defines the window of data for the function to operate on, and then we have the PARTITION BY clause which is used to divide the result set into partitions 
+and the function is applied to each partition separately, and then we have the ORDER BY clause which is used to order the rows within each partition before applying the function, followed by frame clause
+*/
 
+/* 
+WINDOW FUNCTIONS are divided into three groups:
+#1 AGGREGATE WINDOW FUNCTIONS --> These functions perform aggregation on a specific subset of data defined by the window, such as SUM(), AVG(), COUNT(), MAX(), MIN()
+#2 RANKING WINDOW FUNCTIONS --> These functions assign a rank or a number to each row within a partition based on the specified order, such as ROW_NUMBER(), RANK(), DENSE_RANK(), CUME_DIST(), PERCENT_RANK(), NTILE()
+#3 VALUE ANALYTICAL FUNCTIONS --> These functions return a value from a specific row within the window, such as FIRST_VALUE(), LAST_VALUE(), LAG(), LEAD(), NTH_VALUE()
+*/
+
+/*
+The COUNT FUNCTION exceptes every datatype
+SUM(), AVG(), MAX(), MIN() functions only accept numeric datatypes, if we try to use them on non-numeric datatypes then it will throw an error
+ROWNUMBER(), RANK(), DENSE_RANK(), CUME_DIST(), PERCENT_RANK() should be empty, they do not accept any arguments
+NTILE() function accepts one argument which is the number of groups to divide the data into, and it should be a positive integer
+FIRST_VALUE(), LAST_VALUE(), LAG(), LEAD() functions accept any datatype as an argument, but the argument should be a column name or an expression that returns a value from a specific row within the window, and it should be used with the OVER() clause to define the window of data for the function to operate on
+*/
+
+-- PARTITION BY Clause divides the dataset into windows
+
+-- SUM(Sales) OVER() --> If we do this then SQL will calculate the total sales across all orders and it will return the same total sales value for each row in the result set, because we are not using any PARTITION BY clause to divide the data into partitions, so the function is applied to the entire result set as a single partition (Whole dataset is considered as one partition or one window)
+-- SUM(Sales) OVER(PARTITION BY ProductID) --> If we do this then SQL will calculate the total sales for each product across all orders and it will return the total sales for each product in the result set, because we are using PARTITION BY clause to divide the data into partitions based on the ProductID column, so the function is applied to each partition separately (Each product is considered as a separate partition or window)
 
 
 
