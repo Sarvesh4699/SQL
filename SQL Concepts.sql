@@ -794,15 +794,22 @@ FROM CTE2
 /* Create report showing total sales for each of the following categories: High (sales over 50), Medium (sales 21-50), and Low (sales 20 or less)
 Sort the categories from highest sales to lowest */
 
+
 SELECT
-OrderID, 
-Sales,
-CASE
-    WHEN Sales > 50 THEN 'High'
-    WHEN Sales > 20 THEN 'Medium'
-    ELSE 'Low'
-END Category
+Category,
+SUM(Sales) AS TotalSales
+FROM (
+    SELECT
+    OrderID, 
+    Sales,
+    CASE
+        WHEN Sales > 50 THEN 'High'
+        WHEN Sales > 20 THEN 'Medium'
+        ELSE 'Low'
+    END Category
 FROM SalesDB.Sales.Orders
+) AS t
+GROUP BY Category
 
 
 
