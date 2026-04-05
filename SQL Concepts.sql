@@ -752,7 +752,7 @@ SELECT Id, Category,
 DATALENGTH(Category) AS CategoryLen
 FROM CTE1
 -- In the above query we are creating a Common Table Expression (CTE) with four rows, where the Category column has different types of values including a non-empty string ('A'), a NULL value, an empty string (''), and a blank space (' ')
--- When we calculate the length of the Category column using the DATALENGTH function, we can see that the non-empty string has a length of 1, the NULL value has a length of NULL, the empty string has a length of 0, and the blank space has a length of 1 because it contains one space character
+-- When we calculate the length of the Category column using the DATALENGTH function, we can see that the non-empty string has a length of 1, the NULL value has a length of NULL, the empty string has a length of 0, and the blank space has a length of 2 because it contains two space characters
 -- Performace is best for NULL values, then empty string and then blank space because blank space takes more storage than empty string and empty string takes more storage than NULL value
 -- To compare we use IS NULL for NULL values, = '' for empty strings and = ' ' for blank spaces
 
@@ -781,7 +781,30 @@ FROM CTE2
 -- This way we can handle all three cases (NULL values, empty strings, and blank spaces) in a consistent manner by treating them as unknown categories in our analysis or reporting
 -- The choice of how to handle NULL values, empty strings, and blank spaces in your data depends on the specific requirements of your analysis or reporting, as well as the conventions and standards of your organization. It's important to have a clear data policy for handling these cases to ensure consistency and accuracy in your results.
 --! Data Policy --> Use case Replacing empty strings and blanks with NULL during data preparation before inserting into a database to optimize storage and performance
---! Data Policy --> Use case Replacing empty strings, blanks, NULL with default value during data preparation before using it in reporting to improve readiblity and reduce confusion
+--! Data Policy --> Use case Replacing empty f, blanks, NULL with default value during data preparation before using it in reporting to improve readiblity and reduce confusion
+
+
+--*-----------------------
+-- * CASE WHEN STATEMENT
+--*-----------------------
+-- It is used to perform conditional logic in SQL queries, allowing you to return different values based on specific conditions. It is similar to the IF-ELSE statement in programming languages.
+-- Order of conditions is important in CASE WHEN statement because SQL evaluates the conditions in the order they are written and returns the result of the first condition that is true, so if you have multiple conditions that can be true for a given row, only the result of the first true condition will be returned.
+-- If none fo the conditions are true, then the ELSE part will be executed and it will return the value specified in the ELSE clause. If there is no ELSE clause and none of the conditions are true, then it will return NULL.
+
+/* Create report showing total sales for each of the following categories: High (sales over 50), Medium (sales 21-50), and Low (sales 20 or less)
+Sort the categories from highest sales to lowest */
+
+SELECT
+OrderID, 
+Sales,
+CASE
+    WHEN Sales > 50 THEN 'High'
+    WHEN Sales > 20 THEN 'Medium'
+    ELSE 'Low'
+END Category
+FROM SalesDB.Sales.Orders
+
+
 
 
 --*-----------------------
