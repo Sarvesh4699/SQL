@@ -905,7 +905,7 @@ GROUP BY CustomerID;
 --*-----------------------
 -- * WINDOW FUNCTIONS
 --*-----------------------
--- WINDOW FUNCTIONS are also known as ANALYTICAL FUNCTIONS or OLAP (ONLINE ANALYTICAL PROCESSING) FUNCTIONS
+--* WINDOW FUNCTIONS are also known as ANALYTICAL FUNCTIONS or OLAP (ONLINE ANALYTICAL PROCESSING) FUNCTIONS
 -- Perform calculations (e.g. aggregation) on a specific subset of data, without losing the level of details of rows
 
 -- GORUP BY does simple aggregation and it reduces the level of details of rows, while WINDOW FUNCTIONS perform calculations on a specific subset of data, without losing the level of details of rows
@@ -929,7 +929,7 @@ First part is WINDOW FUNCTION, then we have the OVER() clause which defines the 
 and the function is applied to each partition separately, and then we have the ORDER BY clause which is used to order the rows within each partition before applying the function, followed by frame clause
 */
 
-/* 
+/*
 WINDOW FUNCTIONS are divided into three groups:
 #1 AGGREGATE WINDOW FUNCTIONS --> These functions perform aggregation on a specific subset of data defined by the window, such as SUM(), AVG(), COUNT(), MAX(), MIN()
 #2 RANKING WINDOW FUNCTIONS --> These functions assign a rank or a number to each row within a partition based on the specified order, such as ROW_NUMBER(), RANK(), DENSE_RANK(), CUME_DIST(), PERCENT_RANK(), NTILE()
@@ -944,17 +944,227 @@ NTILE() function accepts one argument which is the number of groups to divide th
 FIRST_VALUE(), LAST_VALUE(), LAG(), LEAD() functions accept any datatype as an argument, but the argument should be a column name or an expression that returns a value from a specific row within the window, and it should be used with the OVER() clause to define the window of data for the function to operate on
 */
 
--- PARTITION BY Clause divides the dataset into windows
-
+--* PARTITION BY Clause divides the dataset into windows
 -- SUM(Sales) OVER() --> If we do this then SQL will calculate the total sales across all orders and it will return the same total sales value for each row in the result set, because we are not using any PARTITION BY clause to divide the data into partitions, so the function is applied to the entire result set as a single partition (Whole dataset is considered as one partition or one window)
 -- SUM(Sales) OVER(PARTITION BY ProductID) --> If we do this then SQL will calculate the total sales for each product across all orders and it will return the total sales for each product in the result set, because we are using PARTITION BY clause to divide the data into partitions based on the ProductID column, so the function is applied to each partition separately (Each product is considered as a separate partition or window)
 
+--* WINDOW ORDER BY
+-- Rank each order based on their sales from highest to lowest additionally provide details such order id & order date
+SELECT OrderID, OrderDate, CustomerID, Sales,
+RANK() OVER(ORDER BY Sales DESC) As sales_rank 
+FROM SalesDB.Sales.Orders
+
+--* FRAME CLAUSE OR WINDOW FRAME
+-- It is used to define a subset of rows within the window for the function to operate on, it is used in conjunction with the ORDER BY clause in the OVER() clause of a window function
+-- It allows you to specify a range of rows relative to the current row, such as a certain number of preceding or following rows, or a range of rows based on a specific condition
+-- The frame clause can be defined using ROWS or RANGE keywords, followed by the specification of the frame boundaries (e.g., UNBOUNDED PRECEDING, CURRENT ROW, N PRECEDING, N FOLLOWING, etc.)
+-- The frame clause is optional, and if it is not specified, the default frame is RANGE UNBOUNDED PRECEDING, which means that the function will operate on all rows from the beginning of the partition up to the current row
+
+--* FRAME TYPES are ROWS and RANGE
+-- ROWS --> It defines the frame based on a specific number of rows relative to the current row, it is used when you want to specify a fixed number of rows to include in the frame, regardless of the values in the columns
+-- RANGE --> It defines the frame based on a range of values in the ORDER BY column, it is used when you want to specify a range of values to include in the frame, based on the values in the ORDER BY column
+
+--* FRAME BOUNDARY
+-- UNBOUNDED PRECEDING --> It includes all rows from the beginning of the partition up to the current row (LOWER FRAME BOUNDARY)
+-- UNBOUNDED FOLLOWING --> It includes all rows from the current row to the end of the partition (HIGHER FRAME BOUNDARY)
+-- CURRENT ROW --> It includes only the current row in the frame (LOWER AND HIGHER FRAME BOUNDARY)
+-- N PRECEDING --> It includes a specific number of rows before the current row in the frame (LOWER FRAME BOUNDARY)
+-- N FOLLOWING --> It includes a specific number of rows after the current row in the frame (HIGHER FRAME BOUNDARY)
+
+--! FRAME CLAUSE can only be used together with ORDER BY clause in the OVER() clause of a window function, and it cannot be used without an ORDER BY clause because the frame is defined based on the order of the rows in the result set, so without an ORDER BY clause, there is no defined order for the rows and therefore no way to determine which rows should be included in the frame
+/*
+Lower value must be below the higher value in the frame clause, for example if we specify 3 PRECEDING as the lower frame boundary and 2 FOLLOWING as the higher frame boundary, then it will include 3 rows before the current row and 2 rows after the current row in the frame, 
+but if we specify 2 FOLLOWING as the lower frame boundary and 3 PRECEDING as the higher frame boundary, then it will throw an error because the lower value (2 FOLLOWING) is not below the higher value (3 PRECEDING) in terms of their position relative to the current row
+*/
+
+SELECT
+OrderID, 
+OrderDate, 
+OrderStatus, 
+Sales,
+SUM (Sales) OVER (PARTITION BY OrderStatus ORDER BY OrderDate
+ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) TotalSales,
+
+RANK() OVER(PARTITION BY OrderStatus ORDER BY OrderDate) AS SalesRank,
+
+SUM(Sales) OVER(PARTITION BY OrderStatus ORDER BY OrderDate
+ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS TotalSalesWithFrame,
+
+Sum(Sales) OVER(PARTITION BY OrderStatus ORDER BY OrderDate
+ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS TotalSalesWithFrame2,
+
+Sum(Sales) OVER(PARTITION BY OrderStatus ORDER BY OrderDate
+ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) AS TotalSalesWithFrame3
+
+FROM SalesDB.Sales.Orders
+
+--? RULES for using window functions
+-- #1 WINDOW FUNCTIONS can only be used in SELECT clause, ORDER BY clause and in the PARTITION BY clause of another window function, but they cannot be used in the WHERE clause, GROUP BY clause, or HAVING clause because these clauses are evaluated before the window functions are applied, so the window functions do not have access to the rows that are being filtered or grouped by these clauses
+-- #2 You cannot use a window function inside another window function, but you can use a window function inside an aggregate function or a ranking function, and you can also use a window function inside a subquery or a Common Table Expression (CTE) to achieve more complex calculations and analyses
+-- #3 Window function will be executed after the WHERE clause
+-- #4 Window Function can be used together with GROUP BY in the same query, ONLY if the same columns are used 
+
+SELECT
+CustomerID,
+SUM(Sales) TotalSales,
+RANK() OVER(ORDER BY SUM(Sales) DESC) RankCustomers
+FROM SalesDB.Sales.Orders
+GROUP BY CustomerID
+
+--* WINDOW AGGREGATE FUNCTIONS
+--* COUNT()
+
+-- Find the total number of orders for each product
+SELECT ProductID,
+COUNT(*) AS TotalOrders, -- Will include NULL values as well because COUNT(*) counts all rows regardless of NULL values
+COUNT(1) AS TotalOrders2, -- Will also include NULL values as well because COUNT(1) counts all rows regardless of NULL values and is similar to COUNT(*)
+COUNT(Sales) AS TotalOrdersWithSales -- Will only count the rows where Sales is not NULL because COUNT(column_name) counts only non-NULL values in that column
+FROM SalesDB.Sales.Orders
+GROUP BY ProductID
+
+-- Check whether the table OrdersArchive has duplicate OrderIDs
+SELECT * 
+FROM (
+    SELECT
+    OrderID,
+    COUNT(*) OVER(PARTITION BY OrderID) AS CheckPK
+    FROM SalesDB.Sales.OrdersArchive
+)t WHERE CheckPK > 1
+
+--* COUNT USE CASES
+-- Overall Analysis
+-- Category Analysis
+-- Quality checks: Identify duplicates
+-- Quality checks: Identify NULLS
+
+--* SUM()
+-- Returns sum of all values within each window
+
+-- Find the total sales across all orders and the total sales for each product. Additionally, provide details such as order ID and order date.
+SELECT 
+OrderID, 
+OrderDate,
+ProductID,
+SUM(Sales) OVER() AS TotalSalesAllOrders, --  While doing SUM(Sales) it does not include NULL values in the Sales column, so it will only sum the non-NULL values in the Sales column across all orders and return the total sales for all orders in the result set
+SUM(Sales) OVER(PARTITION BY ProductID) AS TotalSalesPerProduct
+FROM SalesDB.Sales.Orders
+
+-- Find the percentage contribution of each product's sales to the total sales
+SELECT
+OrderID,
+ProductID,
+Sales,
+SUM(Sales) OVER() AS TotalSalesAllOrders,
+ROUND(CAST(Sales AS FLOAT) / SUM(Sales) OVER() * 100, 2) AS PercentageContribution -- We did CAST as column Sales was integer and we want to get the percentage contribution in decimal format, so we need to cast it as FLOAT before doing the division, otherwise it will give us 0 for all products because of integer division
+FROM SalesDB.Sales.Orders
+ORDER BY PercentageContribution DESC
+-- This is what we call PART-TO-WHOLE analysis (shows contribution of each data point to the overall total)
 
 
+--* AVG()
+-- Returns the average of all values within each window
+
+-- Find the average sales across all orders and the average sales for each product. Additionally, provide details such as order ID and order date.
+SELECT 
+OrderID, 
+OrderDate, 
+ProductID, 
+Sales,
+AVG(Sales) OVER() AS AverageSalesAllOrders,  -- While doing AVG(Sales) it does not include NULL values in the Sales column, so it will only average the non-NULL values in the Sales column across all orders and return the average sales for all orders in the result set
+AVG(Sales) OVER(PARTITION BY ProductID) AS AverageSalesPerProduct,
+AVG(COALESCE(Sales, 0)) OVER() AS AverageSalesAllOrdersWithNullsAsZero, -- This will consider NULL values as 0 in the Sales column while calculating the average sales across all orders, so it will average all values in the Sales column including NULL values (which are treated as 0) across all orders and return the average sales for all orders in the result set
+AVG(COALESCE(Sales, 0)) OVER(PARTITION BY ProductID) AS AverageSalesPerProductWithNullsAsZero -- This will consider NULL values as 0 in the Sales column while calculating the average sales for each product, so it will average all values in the Sales column including NULL values (which are treated as 0) for each product and return the average sales for each product in the result set
+FROM SalesDB.Sales.Orders
 
 
+SELECT 
+FirstName, 
+LastName, 
+Score,
+AVG(Score) OVER() AS AverageScoreAllCustomers, -- Will not include NULL values in the Score column, so it will only average the non-NULL values in the Score column across all customers and return the average score for all customers in the result set
+AVG(COALESCE(Score,0)) OVER() AS AverageScoreAllCustomersWithNullsAsZero -- In this the NULL values are handled and treated as 0 in the Score column while calculating the average score across all customers, so it will average all values in the Score column including NULL values (which are treated as 0) across all customers and return the average score for all customers in the result set
+FROM SalesDB.Sales.Customers
+
+-- Find all orders where sales are above the average sales across all orders
+SELECT OrderID,
+Sales,
+IsAboveAverage 
+FROM (
+    SELECT
+    OrderID,
+    Sales,
+    AVG(Sales) OVER() AS AverageSalesAllOrder,
+    CASE 
+        WHEN Sales > AVG(Sales) OVER() THEN 1 
+        ELSE 0 
+    END AS IsAboveAverage
+    FROM SalesDB.Sales.Orders
+    ) t
+WHERE IsAboveAverage = 1
 
 
+--* MIN() and MAX()
+-- Returns the minimum and maximum value within each window respectively
+
+-- Find the highest & lowest sales across all orders and the highest & lowest sales for each product. Additionally, provide details such as order ID and order date.
+SELECT 
+OrderID,
+OrderDate,
+ProductID,
+Sales,
+MIN(Sales) OVER() AS LowestSalesAllOrders,
+MAX(Sales) OVER() AS HighestSalesAllOrders,
+MIN(Sales) OVER(PARTITION BY ProductID) AS LowestSalesPerProduct,
+MAX(Sales) OVER(PARTITION BY ProductID) AS HighestSalesPerProduct,
+MIN(COALESCE(Sales, 0)) OVER() AS LowestSalesAllOrdersWithNullsAsZero, -- This will consider NULL values as 0 in the Sales column while calculating the lowest sales across all orders, so it will find the minimum value in the Sales column including NULL values (which are treated as 0) across all orders and return the lowest sales for all orders in the result set
+MAX(COALESCE(Sales, 0)) OVER() AS HighestSalesAllOrdersWithNullsAsZero -- This will consider NULL values as 0 in the Sales column while calculating the highest sales across all orders, so it will find the maximum value in the Sales column including NULL values (which are treated as 0) across all orders and return the highest sales for all orders in the result set
+FROM SalesDB.Sales.Orders
+
+-- Show the employees who have the highest salaries
+SELECT
+*
+FROM (
+    SELECT
+    *,
+    MAX (Salary) OVER() HighestSalary
+    FROM SalesDB.Sales.Employees
+    )t 
+WHERE Salary = HighestSalary
+
+-- Calculate the deviation of each sale from both the minimum and maximum sales amounts.
+SELECT
+OrderID,
+Sales,
+MIN(Sales) OVER() AS MinSales,
+MAX(Sales) OVER() AS MaxSales,
+Sales - MIN(Sales) OVER() AS DeviationFromMin,
+MAX(Sales) OVER() - Sales AS DeviationFromMax
+FROM SalesDB.Sales.Orders
+
+-- RUNNING AND ROLLING TOTAL
+-- RUNNING TOTAL: Aggregate all values from the beginning up to the current point without dropping off older data.
+-- ROLLING TOTAL: Aggregate a fixed number of rows around the current row (Aggregate all values within a fixed time window (e.g. 30 days). As new data is added, the oldest data point will be dropped.)
+
+-- Example of running total: Calculate the running total of sales for each order based on the order date
+SELECT
+OrderID,
+OrderDate,
+Sales,
+SUM(Sales) OVER(ORDER BY OrderDate ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS RunningTotalSales
+FROM SalesDB.Sales.Orders
+
+
+-- Calculate moving average of sales for each product over time
+-- Calculate moving average of sales for each product over time, including only the next order
+SELECT
+OrderID,
+ProductID,
+OrderDate,
+Sales,
+AVG (Sales) OVER (PARTITION BY ProductID) AvgByProduct,
+AVG(Sales) OVER (PARTITION BY ProductID ORDER BY OrderDate) MovingAvg,
+AVG(Sales) OVER (PARTITION BY ProductID ORDER BY OrderDate ROWS BETWEEN CURRENT ROW AND 1 FOLLOWING) RollingAvg
+FROM SalesDB.Sales.Orders
 
 
 
