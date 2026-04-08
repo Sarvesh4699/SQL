@@ -1248,9 +1248,157 @@ FROM SalesDB.Sales.OrdersArchive
 -- If rn > 1 then it means that there are duplicate rows for that OrderID, that may be outdated data
 
 --* PERCENTAGE BASED RANKING FUNCTION
--- CUME_DIST() --> It is cumulative distribution that calculates distribution of data within a window
+--* CUME_DIST() --> It is cumulative distribution that calculates distribution of data points within a window
 -- CUME_DIST is Position number of the value/Total number of rows in the partition
+SELECT *,
+CUME_DIST() OVER(ORDER BY Sales DESC) AS cumulative 
+FROM SalesDB.Sales.Orders
+-- If two points have the same value then they will both have same cumulative distribution value
 
+
+--* PERCENT_RANK() --> Calculates the relative position of each row within a window
+-- Percent rank always has scale o to 1
+-- PERCENT_RANK() is position number of the value - 1 / Total number of rows - 1 
+SELECT *,
+PERCENT_RANK() OVER(ORDER BY Sales DESC) AS cumulative 
+FROM SalesDB.Sales.Orders
+
+-- Find the products that fall within the highest 40% of the prices
+SELECT * 
+FROM (
+    SELECT *,
+    CUME_DIST() OVER(ORDER BY Price DESC) AS cumDist
+    FROM SalesDB.Sales.Products
+) t
+WHERE cumDist <= 0.4
+
+--* NTILE(n) --> Divides the rows into a specified number of approximately equal groups (Buckets)
+-- Bucket Size = Number of Rows / Number of Buckets
+-- SQL RULE --> Larger groups comes first
+
+SELECT 
+OrderID,
+Sales,
+NTILE(1) OVER(ORDER BY Sales DESC) AS oneBucket,
+NTILE(2) OVER(ORDER BY Sales DESC) AS twoBucket,
+NTILE(3) OVER(ORDER BY Sales DESC) AS threeBucket,
+NTILE(4) OVER(ORDER BY Sales DESC) AS fourBucket
+FROM SalesDB.Sales.Orders
+
+-- First we will calculate the bucket size (Number of Rows / Number of Buckets)
+-- B = Floor(T / n)
+-- Then we will calculate remainder to distribute the remaining rows equally in buckets
+-- R = T % n
+-- For example we have 10 rows and we want to have buckets, then Bucket Size = Floor(10/4) --> Floor(2.5) --> 2 (So Each bucket will have atleast 2 rows)
+-- Now we will calculate the remainder that is R = 10 % 4 --> 2 (So these two rows will be distributed equally among the initail buckets)
+-- So there are now 4 buckets
+/*
+Bucket 1 --> 2 + 1 --> 3
+Bucket 2 --> 2 + 1 --> 3
+Bucket 3 --> 2
+Bucket 4 --> 2
+*/
+
+-- NTILE() USE CASE
+-- Data segmentation --> Data Analyst (Divides a dataset into distinct subsets based on certain criteria.)
+
+-- Segment all orders into 3 categories: high, medium and low sales.
+
+SELECT *,
+CASE WHEN Buckets = 1 THEN 'High'
+WHEN Buckets = 2 THEN 'Medium'
+WHEN Buckets = 3 THEN 'Low'
+END SalesSegmentations
+FROM (
+    SELECT
+    OrderID, Sales,
+    NTILE(3) OVER (ORDER BY Sales DESC) Buckets
+    FROM SalesDB.Sales.Orders
+) t
+
+
+-- Load Balancing in ETL -- Data Engineer
+-- If we want to transfer a large table from one database to other database then we can split the table into buckets and then transfer it one by one
+-- And in the second databaase we can Use SET operators such as UNION to combine all the small tables into one big table
+
+-- -- In order to export the data, divide the orders into 2 groups.
+SELECT
+NTILE(4) OVER (ORDER BY OrderID) Buckets,
+*
+FROM SalesDB.Sales.Orders
+
+
+--* WINDOW VALUE FUNCTIONS
+--* LEAD() --> Access a value from next row within a window
+--* LAG() --> Access a value from previous row within a window
+
+-- SYNTAX
+-- LEAD --> LEAD(Sales,2,10) OVER(PARTITION BY ProductID ORDER BY OrderDate)
+-- First argument is required that is an expression or a column which can be of any data type
+-- Second argument is Offset, this is an optional argument, Number of Rows forward or backward from the current row, default is 1
+-- Third argument is Default value, returns default value if next/previous value is not available, Default is NULL
+-- PARTITION BY is Optional
+-- ORDER BY is required
+
+-- TIME SERIES ANALYSIS
+-- Year-over-Year (YoY) --> Analyze the overall growth or decline of the business's performance over time
+-- Month-over-Month (MoM) --> Analyze short-term trends and discover patterns in seasonality
+
+-- Analyze the month-over-month performance by finding the percentage change in sales between the current and previous months
+
+SELECT *,
+CASE 
+    WHEN prevMonth != 0 THEN ROUND((CAST((currentMonth - prevMonth) AS FLOAT) / prevMonth) *100, 2)
+    ELSE 0
+END AS percentChange
+FROM(
+    SELECT
+    MONTH(OrderDate) AS Month,
+    SUM(Sales) as currentMonth,
+    LAG(SUM(Sales),1,0) OVER(ORDER BY MONTH(OrderDate)) As prevMonth
+    FROM SalesDB.Sales.Orders
+    GROUP BY MONTH(OrderDate)
+)t
+
+-- CUSTOMER RETENTION ANALYSIS
+-- Measure customer's behavior and loyalty to help businesses build strong relationships with customers
+
+-- In order to analyze customer loyalty, rank customers based on the average days between their orders
+
+SELECT
+CustomerID,
+AVG(diff) as AvgDaysBetweenOrders
+FROM (
+    SELECT *,
+    DATEDIFF(DAY, OrderDate, nextOrderDate) AS diff
+    FROM (
+        SELECT
+        OrderID,
+        CustomerID,
+        OrderDate,
+        Sales,
+        LEAD(OrderDate) OVER(PARTITION BY CustomerID ORDER BY OrderDate) AS nextOrderDate
+        FROM SalesDB.Sales.Orders
+    ) t
+) t1
+GROUP BY CustomerID
+HAVING AVG(diff) IS NOT NULL
+
+SELECT
+CustomerID,
+AVG(diff) AS AvgDaysBetweenOrders
+FROM (
+    SELECT
+    OrderID,
+    CustomerID,
+    OrderDate,
+    Sales,
+    LEAD(OrderDate) OVER(PARTITION BY CustomerID ORDER BY OrderDate) AS nextOrderDate,
+    DATEDIFF(DAY, OrderDate, LEAD(OrderDate) OVER(PARTITION BY CustomerID ORDER BY OrderDate)) AS diff
+    FROM SalesDB.Sales.Orders
+) t
+GROUP BY CustomerID
+HAVING AVG(diff) IS NOT NULL
 
 
 
