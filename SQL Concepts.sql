@@ -932,7 +932,7 @@ and the function is applied to each partition separately, and then we have the O
 /*
 WINDOW FUNCTIONS are divided into three groups:
 #1 AGGREGATE WINDOW FUNCTIONS --> These functions perform aggregation on a specific subset of data defined by the window, such as SUM(), AVG(), COUNT(), MAX(), MIN()
-#2 RANKING WINDOW FUNCTIONS --> These functions assign a rank or a number to each row within a partition based on the specified order, such as ROW_NUMBER(), RANK(), DENSE_RANK(), CUME_DIST(), PERCENT_RANK(), NTILE()
+#2 RANKING WINDOW FUNCTIONS --> These functions assign a rank or a number to each row within a partition based on the specified order, such as ROW_NUMBER(), RANK(), DENSE_RANK(), NTILE(), CUME_DIST(), PERCENT_RANK()
 #3 VALUE ANALYTICAL FUNCTIONS --> These functions return a value from a specific row within the window, such as FIRST_VALUE(), LAST_VALUE(), LAG(), LEAD(), NTH_VALUE()
 */
 
@@ -1165,6 +1165,92 @@ AVG (Sales) OVER (PARTITION BY ProductID) AvgByProduct,
 AVG(Sales) OVER (PARTITION BY ProductID ORDER BY OrderDate) MovingAvg,
 AVG(Sales) OVER (PARTITION BY ProductID ORDER BY OrderDate ROWS BETWEEN CURRENT ROW AND 1 FOLLOWING) RollingAvg
 FROM SalesDB.Sales.Orders
+
+
+--* RANKING WINDOW FUNCTIONS
+-- These functions assign a rank or a number to each row within a partition based on the specified order, such as ROW_NUMBER(), RANK(), DENSE_RANK(), NTILE(), CUME_DIST(), PERCENT_RANK()
+-- Frame Clause cannot be used with ranking functions because ranking functions do not operate on a specific subset of rows defined by a frame, but rather they assign a rank or a number to each row within the entire partition based on the specified order, so there is no need to define a frame for these functions to operate on
+
+--* ROW_NUMBER()
+-- Assigns a unique sequential integer to rows within a partition of a result set, starting at 1 for the first row in each partition. It does not skip any numbers in the sequence, even if there are ties in the ordering.
+-- ROW_NUMBER() does not handle ties in the ordering, meaning that if two or more rows have the same values in the ORDER BY clause, they will still be assigned unique sequential integers based on their position in the result set, without skipping any numbers in the sequence.
+
+--* RANK()
+-- Assigns a rank to rows within a partition of a result set, with gaps in the ranking values when there are ties in the ordering. If two or more rows have the same values in the ORDER BY clause, they will be assigned the same rank, and the next rank(s) will be skipped accordingly.
+-- For example, if two rows are tied for first place, they will both be assigned a rank of 1, and the next rank assigned will be 3 (skipping rank 2). If three rows are tied for second place, they will all be assigned a rank of 2, and the next rank assigned will be 5 (skipping ranks 3 and 4).
+
+--* DENSE_RANK()
+-- Assigns a rank to rows within a partition of a result set, without gaps in the ranking values when there are ties in the ordering. If two or more rows have the same values in the ORDER BY clause, they will be assigned the same rank, and the next rank(s) will not be skipped.
+-- For example, if two rows are tied for first place, they will both be assigned a rank of 1, and the next rank assigned will be 2 (without skipping any ranks). If three rows are tied for second place, they will all be assigned a rank of 2, and the next rank assigned will be 3 (without skipping any ranks).
+
+-- Rank the orders based on their sales from highest to lowest
+SELECT 
+OrderID,
+Sales,
+ROW_NUMBER() OVER(ORDER BY Sales DESC) AS SalesRank_Row,
+RANK() OVER(ORDER BY Sales DESC) AS SalesRank_Rank,
+DENSE_RANK() OVER(ORDER BY Sales DESC) AS SalesRank_DenseRank
+FROM SalesDB.Sales.Orders
+
+-- Find the top highest sales for each product
+
+SELECT * 
+FROM (
+    SELECT
+    ProductID,
+    OrderID,
+    Sales,
+    ROW_NUMBER() OVER(PARTITION BY ProductID ORDER BY Sales DESC) AS SalesRank
+    FROM SalesDB.Sales.Orders
+    ) t
+WHERE SalesRank = 1
+-- TOP N ANALYSIS: It is a common use case of ranking functions where we want to find the top N values for each group or category in our dataset, such as finding the top 3 highest sales for each product, or the top 5 customers with the highest total sales, etc. By using the ROW_NUMBER() function along with PARTITION BY and ORDER BY clauses, we can assign a unique rank to each row within each partition (group) based on the specified order, and then filter the results to return only the top N rows for each group based on their assigned ranks.
+
+-- Find the lowest 2 customers based on their total sales
+SELECT TOP 2 CustomerID,
+SUM(Sales) AS TotalSales
+FROM SalesDB.Sales.Orders
+GROUP BY CustomerID
+ORDER BY TotalSales ASC
+
+SELECT *
+FROM (
+    SELECT 
+    CustomerID,
+    SUM(Sales) AS TotalSales,
+    ROW_NUMBER() OVER(ORDER BY SUM(Sales) ASC) AS SalesRank
+    FROM SalesDB.Sales.Orders
+    GROUP BY CustomerID
+) t 
+WHERE SalesRank <= 2
+-- BOTTOM N ANALYSIS: Similar to TOP N analysis, but instead of finding the top N values, we want to find the bottom N values for each group or category in our dataset, such as finding the bottom 3 lowest sales for each product, or the bottom 5 customers with the lowest total sales, etc. By using the ROW_NUMBER() function along with ORDER BY clause in ascending order, we can assign a unique rank to each row based on their total sales from lowest to highest, and then filter the results to return only the bottom N rows based on their assigned ranks.
+
+
+--* ROW_NUMBER USE CASES
+--#1 Assign unique ID to the rows of OrdersArchive table
+SELECT
+ROW_NUMBER() OVER(ORDER BY OrderID) AS UniqueID,
+*
+FROM SalesDB.Sales.OrdersArchive
+
+--? PAGINATING: It is a common use case of ranking functions where we want to divide our result set into smaller, more manageable chunks or pages, such as displaying 10 records per page on a website or application. By using the ROW_NUMBER() function along with ORDER BY clause, we can assign a unique sequential integer to each row in the result set based on the specified order, and then filter the results to return only the rows that fall within a specific range of row numbers corresponding to the desired page.
+
+--#2 Identify duplicates
+
+-- Identify duplicate rows in the table 'Orders Archive' and return a clean result without any duplicates
+SELECT * FROM (
+SELECT
+ROW_NUMBER() OVER (PARTITION BY OrderID ORDER BY CreationTime DESC) rn,
+*
+FROM SalesDB.Sales.OrdersArchive
+)t WHERE rn=1
+-- This will give the latest record for each OrderID based on the CreationTime column, and it will remove any duplicate rows with the same OrderID while keeping the most recent one. By using PARTITION BY clause to group the rows by OrderID and ORDER BY clause to sort the rows within each partition by CreationTime in descending order, we can assign a unique sequential integer to each row within each partition, and then filter the results to return only the rows where rn=1, which corresponds to the latest record for each OrderID.
+-- If rn > 1 then it means that there are duplicate rows for that OrderID, that may be outdated data
+
+--* PERCENTAGE BASED RANKING FUNCTION
+-- CUME_DIST() --> It is cumulative distribution that calculates distribution of data within a window
+-- CUME_DIST is Position number of the value/Total number of rows in the partition
+
 
 
 
