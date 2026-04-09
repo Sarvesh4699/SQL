@@ -1367,7 +1367,8 @@ FROM(
 
 SELECT
 CustomerID,
-AVG(diff) as AvgDaysBetweenOrders
+AVG(diff) as AvgDaysBetweenOrders,
+RANK() OVER(ORDER BY AVG(diff)) AS diffRank
 FROM (
     SELECT *,
     DATEDIFF(DAY, OrderDate, nextOrderDate) AS diff
@@ -1386,7 +1387,8 @@ HAVING AVG(diff) IS NOT NULL
 
 SELECT
 CustomerID,
-AVG(diff) AS AvgDaysBetweenOrders
+AVG(diff) AS AvgDaysBetweenOrders,
+RANK() OVER(ORDER BY AVG(diff)) AS diffRank 
 FROM (
     SELECT
     OrderID,
@@ -1399,6 +1401,7 @@ FROM (
 ) t
 GROUP BY CustomerID
 HAVING AVG(diff) IS NOT NULL
+
 
 
 
