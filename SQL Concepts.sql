@@ -1403,6 +1403,37 @@ GROUP BY CustomerID
 HAVING AVG(diff) IS NOT NULL
 
 
+-- Find the average shipping duration in days for each month
+SELECT
+MONTH(OrderDate) AS OrderDate,
+AVG (DATEDIFF (day, OrderDate, ShipDate)) AvgShip
+FROM SalesDB.Sales.Orders
+GROUP BY MONTH(OrderDate)
+
+
+-- Find the number of days between each order and the previous order
+SELECT
+OrderID,
+OrderDate AS currentOrderDate,
+LAG(OrderDate) OVER(ORDER BY OrderDate) AS prevOrderDate,
+DATEDIFF(DAY, LAG(OrderDate) OVER(ORDER BY OrderDate), OrderDate) AS diff
+FROM SalesDB.Sales.Orders
+
+
+--* FIRST_VALUE()
+-- Access a value from the first row within a window
+
+--* LAST_VALUE()
+-- Access a value from the last row within a window
+
+-- Find the lowest and highest sales for each product
+SELECT
+OrderID, ProductID, Sales,
+FIRST_VALUE (Sales) OVER (PARTITION BY ProductID ORDER BY Sales) LowestSales,
+LAST_VALUE (Sales) OVER (PARTITION BY ProductID ORDER BY Sales ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) HighestSales,
+Sales - FIRST_VALUE (Sales) OVER (PARTITION BY ProductID ORDER BY Sales) AS SalesDifference
+FROM SalesDB.Sales.Orders
+
 
 
 
