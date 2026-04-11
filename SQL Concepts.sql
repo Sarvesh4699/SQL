@@ -1557,7 +1557,7 @@ Once the main query finishes processing, the database engine sends the final res
 Finally, the temporary data created for the subquery is cleaned up from memory/cache to free resources for other queries.
 */
 
---* SELECT Subquery
+--* SUBQUERY USING SELECT
 -- Used to aggregate data side by side with the main query's data, allowing for direct comparison.
 --! RULE: Result of the subquery must be scalar
 
@@ -1569,7 +1569,7 @@ ProductID, Product, Price,
 (SELECT COUNT(*) FROM SalesDB.Sales.Orders) AS TotalOrders -- Should return only one value
 FROM SalesDB.Sales.Products
 
---* JOIN Subquery
+--* SUBQUERY USING JOIN
 -- Used to prepare the data (filtering or aggregation) before joining it with other tables.
 
 -- Show all customer details and find the total orders for each customer
@@ -1586,7 +1586,7 @@ LEFT JOIN (
 ON c.CustomerID = o.CustomerID
 
 
---* WHERE Subquery
+--* SUBQUERY USING WHERE
 -- Used for complex filtering logic and makes query more flexible and dynamic
 --! RULE: SUBQUERY must be SCALAR QUERY
 
@@ -1598,11 +1598,119 @@ FROM SalesDB.Sales.Products
 WHERE Price > (SELECT AVG(Price) FROM SalesDB.Sales.Products)
 
 
+--* SUBQUERY USING IN OPERATOR
+--! SUBQUERY IS allowed to have multiple rows
+
+-- Show the details of orders made by customers in Germany
+
+SELECT
+*
+FROM SalesDB.Sales.Orders
+WHERE CustomerID IN
+                (SELECT
+                CustomerID
+                FROM SalesDB.Sales.Customers
+                WHERE Country = 'Germany')
+
+
+--* SUBQUERY USING ALL & ANY OPERATOR
+-- ANY OPERATOR
+-- Checks if a value matches ANY value within a list.
+-- Used to check if a value is true for AT LEAST one of the values in a list.
+
+-- Find female employees whose salaries are greater than the salaries of any male employees
+-- Main Query
+SELECT
+EmployeeID, FirstName,Salary
+FROM SalesDB.Sales.Employees
+WHERE Gender = 'F' AND Salary > ANY (SELECT Salary FROM SalesDB.Sales.Employees WHERE Gender = 'M')
+
+-- Find female employees whose salaries are greater than the salaries of all male employees
+SELECT
+EmployeeID, FirstName,Salary
+FROM SalesDB.Sales.Employees
+WHERE Gender = 'F' AND Salary > ALL (SELECT Salary FROM SalesDB.Sales.Employees WHERE Gender = 'M')
+
+
+--* CORELATED AND NON-CORELATED SUBQUERY
+
+/*
+| Aspect                   | Non-Correlated Subquery                          | Correlated Subquery                              |
+|--------------------------|--------------------------------------------------|--------------------------------------------------|
+| Definition               | Independent of the main query                    | Dependent on the main query                      |
+| Execution                | Executed once                                    | Executed for each row of the main query          |
+| Standalone Execution     | Can be executed independently                    | Cannot be executed independently                 |
+| Readability              | Easier to read                                   | More complex and harder to read                  |
+| Performance              | Better (runs once)                               | Slower (runs multiple times)                     |
+| Usage                    | Static comparisons, constant filtering           | Row-by-row comparisons, dynamic filtering        |
+*/
+
+-- Show all customer details and find the total orders for each customer
+-- Main Query
+SELECT
+*,
+(SELECT COUNT(*) FROM SalesDB.Sales.Orders o WHERE o.CustomerID = c.CustomerID) TotalSales
+FROM SalesDB.Sales.Customers c
+
+--* EXISTS
+
+-- Find customer who has placed atleast one order
+SELECT 
+    c.CustomerID,
+    c.FirstName,
+    c.LastName,
+    c.Country
+FROM SalesDB.Sales.Customers c
+WHERE EXISTS (
+    SELECT 1
+    FROM SalesDB.Sales.Orders o
+    WHERE o.CustomerID = c.CustomerID
+)
+-- EXPLANATION: First Main Query will run that is the customers table --> Each record from the customers table will be passed to the EXISTS subquery, 
+-- the subquery will check that if the customerID from the customers table is there in the customerID of the Orders table, if it finds atleast one match then
+-- EXISTS will return TRUE and the original record from the customers will be kept in the result set. Now the main query will pass the second record from the customers table, agian it will check
+-- the customerID from the customers table to the customerID from the Orders table, if it finds atleast one match then EXISTS will return TRUE and that record will be kept inside the result set
+-- And it will continue with the third record and so on, If a particular customerID of the customers table is not found in the customerID of the Orders table then EXISTS will return FALSE and then that record will not be included in the result set
+
+
+-- EXISTS checks if at least one matching row exists in orders
+
+-- For each customer:
+-- Step 1: Take c.CustomerID
+-- Step 2: Check in orders table:
+--         SELECT 1 FROM orders WHERE o.CustomerID = c.CustomerID
+-- Step 3:
+--    - If match found --> include customer
+--    - If no match --> exclude customer
+--? EXISTS stops as soon as it finds the first match (efficient)
+
+-- Find customers who have at least one Delivered order
+SELECT 
+    c.CustomerID,
+    c.FirstName,
+    c.Country
+FROM SalesDB.Sales.customers c
+WHERE EXISTS (
+    SELECT 1
+    FROM SalesDB.Sales.Orders o
+    WHERE o.CustomerID = c.CustomerID AND o.OrderStatus = 'Delivered'
+)
+
+-- Customers with NO orders
+SELECT 
+    c.CustomerID,
+    c.FirstName
+FROM SalesDB.Sales.Customers c
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM SalesDB.Sales.Orders o
+    WHERE o.CustomerID = c.CustomerID
+)
 
 
 
-
-
-
-
+--* CTE (COMMON TABLE EXPRESSION)
+-- Temporary, named result set (virtual table), that can be used multiple times within your query to simplify and organize complex query.
+-- CTEs are locally availabe in the main query and not available globally
+-- Subqueries are used only once however CTEs can be referenced or utilised number of times. It's like a hidden virtual table that lives inside our main query.
 
