@@ -1714,3 +1714,165 @@ WHERE NOT EXISTS (
 -- CTEs are locally availabe in the main query and not available globally
 -- Subqueries are used only once however CTEs can be referenced or utilised number of times. It's like a hidden virtual table that lives inside our main query.
 
+--* There are two types of CTEs
+-- Non-Recursive CTE --> Two subtypes Standalone CTE and Nested CTE
+-- Recursive CTE 
+
+--* Standalone CTE
+-- Defined and Used Indepeently.
+-- Runs independently as it's self-contained and doesn't rely on other CTEs or queries.
+--! You cannot use ORDER BY directly within the CTE
+
+-- Find total sales per customer
+
+WITH TotalSalesPerCustomer AS -- CTE
+(
+    SELECT
+        CustomerID,
+        SUM(Sales) AS totalSales
+    FROM SalesDB.Sales.Orders
+    GROUP BY CustomerID
+)
+-- Main Query
+SELECT
+    c.CustomerID,
+    c.FirstName,
+    c.LastName,
+    t.totalSales
+FROM SalesDB.Sales.Customers c
+LEFT JOIN TotalSalesPerCustomer t
+ON c.CustomerID = t.CustomerID
+
+
+-- Multiple Standalone CTEs
+
+WITH totalSalesPerCustomer AS -- CTE1 (Find total sales per customer)
+(
+    SELECT
+        CustomerID,
+        SUM(Sales) AS totalSales
+    FROM SalesDB.Sales.Orders
+    GROUP BY CustomerID
+),
+lastOrderDateOfCustomer AS -- CTE2 (Find last order date for each customer)
+(
+    SELECT * FROM
+    (
+        SELECT
+        CustomerID,
+        OrderDate as lastOrderDate,
+        RANK() OVER(PARTITION BY CustomerID ORDER BY OrderDate DESC) AS rnk
+        FROM SalesDB.Sales.Orders
+    ) t
+    WHERE rnk = 1
+)
+-- Main Query
+SELECT
+    c.CustomerID,
+    c.FirstName,
+    c.LastName,
+    t.totalSales,
+    t1.lastOrderDate
+FROM SalesDB.Sales.Customers c
+LEFT JOIN totalSalesPerCustomer t
+ON c.CustomerID = t.CustomerID
+LEFT JOIN lastOrderDateOfCustomer t1
+ON t1.CustomerID = c.CustomerID
+
+
+--* NESTED CTE
+-- CTE inside another CTE
+-- A nested CTE uses the result of another CTE, so it can't run independently.
+
+--? CTE BEST PRACTICES
+-- Rethink and refactor your CTEs before starting a new one
+-- Don't use more than 5 CTEs in one query; otherwise, your code will be hard to understand and maintain
+
+/*
+Nested CTEs depend on other CTEs defined earlier in the query, which means they cannot be executed independently. This dependency makes them harder to test and debug compared to standalone CTEs.
+Additionally, CTEs are temporary. Once the query finishes execution, their results are removed from memory. As a result, SQL does not retain any information about the CTE after execution.
+Because of this, if you want to inspect the result of a specific (nested) CTE, you cannot run it alone. Instead, you typically comment out the main query and execute the full statement including all required CTE definitions.
+This highlights the key difference: standalone CTEs can be executed and tested more easily, while nested CTEs are dependent on other CTEs and require the full query context to run.
+*/
+
+
+WITH totalSalesPerCustomer AS -- CTE1 --> Find total sales per customer (STANDALONE CTE)
+(
+    SELECT
+        CustomerID,
+        SUM(Sales) AS totalSales
+    FROM SalesDB.Sales.Orders
+    GROUP BY CustomerID
+),
+lastOrderDateOfCustomer AS -- CTE2 --> Find last order date for each customer (STANDALONE CTE)
+(
+    SELECT * FROM
+    (
+        SELECT
+        CustomerID,
+        OrderDate as lastOrderDate,
+        RANK() OVER(PARTITION BY CustomerID ORDER BY OrderDate DESC) AS rnk
+        FROM SalesDB.Sales.Orders
+    ) t
+    WHERE rnk = 1
+),
+rankCustomers AS -- CTE3 --> Rank Customers based on Total Sales Per Customer (Nested CTE)
+(
+    SELECT
+    CustomerID,
+    totalSales,
+    RANK() OVER(ORDER BY totalSales DESC) AS rnkCustomers
+    FROM totalSalesPerCustomer
+),
+customerSegments AS -- CTE4 --> Segment customers based on their total sales (NESTED CTE)
+(
+    SELECT
+    CustomerID,
+    totalSales,
+    CASE WHEN totalSales > 100 THEN 'High'
+         WHEN totalSales > 80 THEN 'Medium'
+         ELSE 'Low'
+    END AS segemnts
+    FROM totalSalesPerCustomer
+)
+-- Main Query
+SELECT
+    c.CustomerID,
+    c.FirstName,
+    c.LastName,
+    t.totalSales,
+    t1.lastOrderDate,
+    rc.rnkCustomers,
+    cs.segemnts
+FROM SalesDB.Sales.Customers c
+LEFT JOIN totalSalesPerCustomer t
+ON c.CustomerID = t.CustomerID
+LEFT JOIN lastOrderDateOfCustomer t1
+ON t1.CustomerID = c.CustomerID
+LEFT JOIN rankCustomers rc
+ON rc.CustomerID = c.CustomerID
+LEFT JOIN customerSegments cs
+ON cs.CustomerID = c.CustomerID
+
+
+--* RECURSIVE QUERY
+-- Self-referencing query that repeatedly processes data until a specific condition is met
+
+-- Generate sequence from 1 to 20
+
+WITH sequenceGenerator AS
+(
+    SELECT 1 AS MyNumber -- First is the Anchor Query (It is only executed once)
+    UNION ALL
+    SELECT MyNumber + 1 -- Second is Recursive Query (We will get the current value of the number that is 1 and then it will add 1 to it to become 2, Now it will check if the current value that is 2 at the moment is less than the breaking condition then it will continue to next iteration, if the current value is greater than the breaking condition then it wil break out of the loop)
+    FROM sequenceGenerator
+    WHERE MyNumber < 1000 -- Breaking Condition
+)
+SELECT * FROM sequenceGenerator
+OPTION (MAXRECURSION 5000) -- Increase Max Recursion
+
+-- By default, maximum recursion is set to 100, however we can modify number of recursions using the above syntax and can increase max iterations
+
+
+
+
