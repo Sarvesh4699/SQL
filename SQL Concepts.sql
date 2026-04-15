@@ -1874,5 +1874,348 @@ OPTION (MAXRECURSION 5000) -- Increase Max Recursion
 -- By default, maximum recursion is set to 100, however we can modify number of recursions using the above syntax and can increase max iterations
 
 
+-- Task: Show the employee hierarchy by displaying each employee's level within the organization
+
+WITH CTE_Emp_Hierarchy AS (
+-- Anchor Query
+    SELECT
+    EmployeeID, FirstName, ManagerID,
+    1 AS Level
+    FROM SalesDB.Sales.Employees
+    WHERE ManagerID IS NULL
+    UNION ALL
+    --Recursive Query
+    SELECT
+    e. EmployeeID, e. FirstName, e. ManagerID,
+    Level + 1
+    FROM SalesDB.Sales.Employees AS e
+    INNER JOIN CTE_Emp_Hierarchy ceh
+    ON ceh.EmployeeID = e.ManagerID
+)
+-- Main Query
+SELECT *
+FROM CTE_Emp_Hierarchy
+
+
+--* VIEW
+-- Virtual table based on the result set of a query, without storing the data in database.
+-- Views are persisted SQL queries in the database.
+
+--* 3 Level Architecture
+/*
+Three-Level Database Architecture
+Physical Level (Internal Layer)
+    Lowest level, highest complexity
+    Deals with how data is stored (files, partitions, indexes, logs)
+    Managed by DBAs for performance, security, backup, and recovery
+Logical Level (Conceptual Layer)
+    Middle level, moderate complexity
+    Focuses on how data is structured (tables, relationships, indexes, procedures)
+    Used by developers/data engineers
+    Abstracts away physical storage details
+View Level (External Layer)
+    Highest level, simplest
+    Shows only relevant data to users/applications via views
+    Used by end users, analysts, BI tools (e.g., Power BI)
+    Hides all complexity of underlying data
+
+Key Idea
+    Physical → Logical → View = Increasing abstraction, decreasing complexity
+    Each layer hides complexity from the layer above it
+*/
+
+
+--* Table Vs View
+/*
+Tables vs Views (Quick Comparison)
+
+1. Data Storage
+    Tables: Store actual data physically
+    Views: Virtual tables (no data stored, just query results)
+
+2. Maintainability
+    Tables: Harder to modify (schema changes need effort, migrations)
+    Views: Easy to change (just update the query)
+
+3. Performance
+    Tables: Faster (direct data access)
+    Views: Slower (executes underlying query each time)
+
+4. Operations
+    Tables: Support read + write (INSERT, UPDATE, DELETE)
+    Views: Mostly read-only
+
+Key Idea
+    Tables = Storage
+    Views = Representation (dynamic query layer)
+*/
+
+--* CTE Vs View
+/*
+Views vs CTEs (Common Table Expressions)
+
+1. Purpose & Scope
+    CTEs: Used within a single query --> temporary logic
+    Views: Used across multiple queries --> reusable logic
+
+2. Persistence
+    CTEs: Not stored (exist only during query execution)
+    Views: Stored in the database (persisted logic)
+
+3. Reusability
+    CTEs: Improve readability within one query
+    Views: Improve reusability across the entire project
+
+4. Maintenance
+    CTEs: No maintenance (auto-cleaned after query)
+    Views: Require management (create, update, drop)
+
+Key Idea
+    CTE = Temporary logic (one-time use)
+    View = Permanent logic (reusable across queries)
+*/
+
+--* Creating a VIEW
+CREATE VIEW Sales.V_Monthly_Summary AS
+(
+    SELECT
+    DATETRUNC(month, OrderDate) OrderMonth,
+    SUM(Sales) TotalSales,
+    COUNT(OrderID) TotalOrders,
+    SUM(Quantity) TotalQuantities
+    FROM SalesDB.Sales.Orders
+    GROUP BY DATETRUNC(month, OrderDate)
+)
+
+--* Selecting from the VIEW
+SELECT * FROM V_Monthly_Summary
+
+-- Dropping the VIEW
+DROP VIEW V_Monthly_Summary
+
+
+--* Updating the VIEW
+IF OBJECT_ID('Sales.V_Monthly_Summary', 'V') IS NOT NULL -- IF the OBJECT_ID exists then DROP VIEW if not then nothing will happen
+    DROP VIEW Sales.V_Monthly_Summary; -- T-SQL (Transact-SQL is an extension of SQL that adds programming features)
+GO
+
+CREATE VIEW Sales.V_Monthly_Summary AS -- Creating the NEW VIEW with modified script
+(
+    SELECT
+    DATETRUNC(month, OrderDate) OrderMonth,
+    SUM(Sales) TotalSales,
+    COUNT(OrderID) TotalOrders
+    FROM SalesDB.Sales.Orders
+    GROUP BY DATETRUNC(month, OrderDate)
+)
+
+
+--* VIEWS USE CASE (High Complexity)
+CREATE VIEW Sales.V_OrderDetails AS
+(
+    SELECT
+    o.OrderID,
+    o.OrderDate,
+    p.Product,
+    p.Category,
+    COALESCE(c.FirstName, '') + ' ' + COALESCE(c.LastName, '') CustomerName,
+    c.Country CustomerCountry,
+    COALESCE(e.FirstName, '') + '' + COALESCE(e.LastName, '') SalesName,
+    e.Department,
+    o.Sales, o.Quantity 
+    FROM Sales.Orders o LEFT JOIN Sales.Products p
+    ON p.ProductID = o.ProductID
+    LEFT JOIN Sales.Customers c
+    ON c.CustomerID = o.CustomerID
+    LEFT JOIN Sales.Employees e
+    ON e.EmployeeID = o.SalesPersonID
+)
+
+SELECT * FROM Sales.V_OrderDetails
+
+
+--* VIEWS USE CASE (Data Security)
+-- Use views to enforce security and protect sensitive data, by hiding columns and/or rows from tables.
+
+/*
+Views for Data Security
+    Views help protect sensitive data by controlling what users can see
+    Instead of giving direct access to tables, users get access to custom views
+
+Role-Based Access Using Views
+    Managers: Full access (all rows & columns via a view)
+    Data Analysts: Limited columns → Column-level security
+    Students: Limited columns + limited rows → Column + Row-level security
+
+Key Idea
+    Tables = Full data (restricted access)
+    Views = Filtered access based on user roles
+*/
+
+-- Provide a view for EU Sales Team that combines details from All tables And excludes Data related to the USA
+CREATE VIEW Sales.V_OrderDetails_EU AS
+(
+    SELECT
+    o.OrderID,
+    o.OrderDate,
+    p.Product,
+    p.Category,
+    COALESCE(c.FirstName, '') + ' ' + COALESCE(c.LastName, '') CustomerName,
+    c.Country CustomerCountry,
+    COALESCE(e.FirstName, '') + '' + COALESCE(e.LastName, '') SalesName,
+    e.Department,
+    o.Sales, o.Quantity 
+    FROM Sales.Orders o LEFT JOIN Sales.Products p
+    ON p.ProductID = o.ProductID
+    LEFT JOIN Sales.Customers c
+    ON c.CustomerID = o.CustomerID
+    LEFT JOIN Sales.Employees e
+    ON e.EmployeeID = o.SalesPersonID
+    WHERE c.Country != 'USA'
+)
+
+SELECT * FROM Sales.V_OrderDetails_EU
+
+
+--* VIEWS USE CASE (Flexibility)
+/*
+Views for Flexibility & Change Management
+
+When users directly query tables, any change in the data model—like:
+    Renaming tables or columns
+    Splitting one table into multiple tables
+    Adding or removing columns
+can break existing queries, leading to errors, escalations, and dependency issues across teams.
+
+Solution: Use Views as an Abstraction Layer
+    Instead of giving access to tables, users query views
+    Views act as a stable interface between users and the underlying data
+    You can freely modify the physical tables without impacting users
+
+For example:
+    If a table is split --> update the view using JOIN/UNION
+    If a column is renamed --> map it back in the view
+    If schema changes --> adjust the view logic accordingly
+
+Key Idea
+    Tables can change, but views remain consistent for users
+    Views hide backend complexity and protect user queries
+
+Benefits
+    High flexibility to evolve your data model
+    No breaking changes for downstream users
+    Reduced coordination overhead with multiple teams
+    Better maintainability and scalability of data systems
+*/
+
+
+--* VIEWS USE CASE (Multi-Language)
+/*
+Views for Multi-Language Support
+    In real-world projects, databases are often accessed by global teams (e.g., US, Germany, India). If your data model (tables and columns) is only in one language (typically English), it may not be intuitive for all users.
+    Views provide a simple way to present the same data in multiple languages without changing or duplicating the underlying tables.
+
+How It Works
+    The base tables remain unchanged (e.g., orders in English)
+    You create separate views for each language:
+        Rename the view name (e.g., orders --> German equivalent)
+        Translate column names inside the view
+    Each user group accesses the view in their preferred language
+
+For example:
+    English users --> orders
+    German users --> translated view (same data, German column names)
+    Indian users --> another translated view
+
+Key Idea
+    Views = Language-specific representation of the same data
+    One source of truth (tables), multiple user-friendly interfaces (views)
+
+Benefits
+    Improves accessibility and usability for international teams
+    No need to duplicate or sync multiple tables
+    Easy to maintain (update logic in one place)
+    Keeps data consistent while offering localized experiences
+*/
+
+
+--* VIEWS USE CASE (Data Warehouse)
+/*
+
+Views as Virtual Data Marts in a Data Warehouse
+
+In a traditional data warehouse architecture (Inmon approach):
+    Data is collected from multiple source systems
+    It is cleaned, transformed, integrated, and stored in a central Data Warehouse (as tables)
+    This warehouse becomes the single source of truth
+
+However, directly connecting BI tools (like Power BI) to the full warehouse can be:
+    Complex
+    Hard to navigate
+    Not optimized for specific business use cases
+
+What Are Data Marts?
+    Data marts are subject-specific subsets of the data warehouse
+    Each mart is designed for a specific domain or team, such as:
+        Sales
+        Finance
+        Marketing
+    They simplify access and make reporting more efficient.
+
+Key Design Choice
+Q) How should we build data marts?
+    Using physical tables (copying data) ❌
+    Using views (virtual layer) ✅
+
+Best Practice: Virtual Data Marts Using Views
+Instead of duplicating data into new tables:
+    Create views on top of the data warehouse tables
+    These views apply business logic, filtering, joins, and aggregations
+    Each view represents a data mart tailored to a specific use case
+
+Key Idea
+    Data Warehouse (tables): stores integrated, historical data
+    Data Marts (views): provide business-friendly, use-case-specific access
+
+Why Views Are Better Than Tables for Data Marts
+1. No Data Duplication
+    Avoids copying data --> reduces storage and inconsistency risks
+2. Always Up-to-Date
+    Views reflect real-time data from the warehouse
+3. Flexibility & Speed
+    Business logic can be changed instantly by modifying the view
+4. Low Maintenance
+    No need for additional ETL pipelines to move data into marts
+5. Consistency
+    Ensures a single source of truth
+    Prevents mismatches between warehouse and marts
+6. Simpler Architecture
+    Reduces complexity and avoids data chaos
+
+Example flow:
+ERP / CRM / APIs / Files / External Systems
+                ↓
+        Data Warehouse
+   (centralized physical tables,
+    cleaned, integrated, historized)
+                ↓
+       Virtual Data Marts
+   (Sales View, Finance View,
+    Operations View, Marketing View)
+                ↓
+         Reporting Layer
+   (Power BI, dashboards, reports,
+    analytics, end users)
+
+In short, the best practice is:
+- Use tables in the Data Warehouse to physically persist the integrated data
+- Use views in the Data Mart layer to create reusable, flexible, and domain-specific reporting structures
+- Let reporting tools consume the data marts instead of directly querying the raw warehouse
+/*
+
+
+
+
+
 
 
