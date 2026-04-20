@@ -39,7 +39,8 @@ ORDER BY country ASC, score DESC
 -- * GROUP BY
 --*-----------
 -- Combine rows with same values and then we can do aggregation
-SELECT country, sum(score) as total_score_per_country from MyDatabase.dbo.customers
+SELECT country,
+sum(score) as total_score_per_country from MyDatabase.dbo.customers
 GROUP BY country
 -- In this case we are combining country and then we are doing summition of the scores
 
@@ -2211,11 +2212,104 @@ In short, the best practice is:
 - Use tables in the Data Warehouse to physically persist the integrated data
 - Use views in the Data Mart layer to create reusable, flexible, and domain-specific reporting structures
 - Let reporting tools consume the data marts instead of directly querying the raw warehouse
-/*
+*/
+
+--* TWO TYPES OF TABLES
+-- A) Permanent Tables
+-- 1. Traditional Table (CREATE and INSERT)
+-- 2. CTAS (Create Table As Select)
+
+-- B) Temporary Table
+
+--* CTAS VS VIEWS
+-- ============================================================
+-- Views vs CTAS (Create Table As Select) — Summary
+-- ============================================================
+
+-- 1. Data Storage
+-- View:
+--   - Stores only the query (definition/DDL)
+--   - Does NOT store data
+--   - Query is NOT executed at creation
+
+-- CTAS Table:
+--   - Stores the result of the query as actual data
+--   - Query is executed at creation time
+--   - Data is physically stored in the table
+
+-- 2. Query Execution
+-- View:
+--   - Query runs EVERY time you SELECT from the view
+--   - Always fetches data from base/original tables
+
+-- CTAS Table:
+--   - Query runs ONLY once during table creation
+--   - Future SELECTs read directly from stored data
+
+-- 3. Performance
+-- View:
+--   - Slower (query executes every time)
+--   - Extra computation overhead
+
+-- CTAS Table:
+--   - Faster (data already precomputed)
+--   - No need to re-run original query
+
+-- 4. Data Freshness (Most Important Difference)
+-- View:
+--   - Always shows latest/updated data
+--   - Reflects changes in underlying tables
+
+-- CTAS Table:
+--   - Shows snapshot of data at creation time
+--   - Does NOT automatically reflect updates
+--   - Needs manual refresh (re-run CTAS)
+
+-- 5. Maintenance
+-- View:
+--   - Easy to maintain
+--   - No refresh required
+
+-- CTAS Table:
+--   - Requires manual refresh/rebuild
+--   - More maintenance effort
+
+-- 6. One-line Interview Answer
+-- Views are virtual and always return fresh data but are slower,
+-- whereas CTAS tables store precomputed results, making them faster
+-- but potentially outdated.
 
 
+--* SYNTAX
+
+IF OBJECT_ID('Sales.MonthlyOrders', 'U') IS NOT NULL
+    DROP TABLE Sales.MonthlyOrders;
+GO
+
+SELECT
+DATENAME(month, OrderDate) OrderMonth,
+COUNT(OrderID) Totalorders
+INTO Sales.Monthlyorders
+FROM Sales.Orders
+GROUP BY DATENAME (month, OrderDate)
+
+SELECT * FROM Sales.Monthlyorders
+
+--* USE CASE --> SNAPSHOTS
+--* USE CASE --> Physical Data Marts in Datawarehouse
+-- Persisting the Data Marts of a Data warehouse improves the speed of data retrieval compared to using views
 
 
+--* Temporary Tables
+SELECT * 
+INTO #Orders
+FROM Sales.Orders
+-- If we Put # before the table name, it means that it is a temporary table
+-- This is a temporary table and will only live until the session is active. Once we restart the session the temporary tables will be deleted
 
+SELECT * FROM #Orders
 
+--* USE CASE Temp Tables
+-- We use it in order to store intermediate results temporary until we are done with the session
+-- And then once we are done, the database can go and drop that temporary table
 
