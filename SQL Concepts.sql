@@ -39,8 +39,12 @@ ORDER BY country ASC, score DESC
 -- * GROUP BY
 --*-----------
 -- Combine rows with same values and then we can do aggregation
+
+SELECT * FROM MyDatabase.dbo.customers
+
 SELECT country,
-sum(score) as total_score_per_country from MyDatabase.dbo.customers
+sum(score) as total_score_per_country
+FROM MyDatabase.dbo.customers
 GROUP BY country
 -- In this case we are combining country and then we are doing summition of the scores
 
@@ -2312,4 +2316,6 @@ SELECT * FROM #Orders
 --* USE CASE Temp Tables
 -- We use it in order to store intermediate results temporary until we are done with the session
 -- And then once we are done, the database can go and drop that temporary table
+
+
 
