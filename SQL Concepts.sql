@@ -49,8 +49,11 @@ GROUP BY country
 -- In this case we are combining country and then we are doing summition of the scores
 
 -- Find the total scores and total number of customers for each country
+
 SELECT country, SUM(score) as total_score, COUNT(id) as number_of_customers from MyDatabase.dbo.customers
 GROUP BY country
+
+
 
 --*-----------
 -- * HAVING
@@ -61,7 +64,7 @@ SELECT country, SUM(score) as total_score from MyDatabase.dbo.customers
 GROUP BY country
 HAVING SUM(score) > 800
 
-SELECT country, SUM(score) from MyDatabase.dbo.customers
+SELECT country, SUM(score) as total_score from MyDatabase.dbo.customers
 WHERE score > 400
 GROUP BY country
 HAVING SUM(score) > 800
@@ -191,7 +194,7 @@ SELECT * from MyDatabase.dbo.persons
 -- Updates specific rows or a set of rows based on certain condition
 -- Note: Always use WHERE to avoid UPDATING all rows unintentionally
 
--- Question: Change the score of customer with ID 6 to O
+-- Question: Change the score of customer with ID 6 to 0
 SELECT * FROM MyDatabase.dbo.customers
 
 UPDATE MyDatabase.dbo.customers
@@ -503,9 +506,7 @@ INTERSECT
 SELECT FirstName, LastName FROM SalesDB.Sales.Customers
 -- This will give us the first name and last name combinations of employees who are also customers at the same time
 
-
 -- Orders are stored in separate tables (Orders and OrdersArchive). Combine all orders into one report without duplicates.
-
 SELECT 
 'Orders' AS SourceTable, -- This is a new column to identify the source of the data
     [OrderID]
@@ -675,7 +676,7 @@ and portability rather than performance */
 --? Handling NULL values in data aggregation
 -- Let's say we have values 10,25,NULL, and then we want to do data aggregation on these values
 --! NOTE: Now if we do the AVG() of these values, then SQL will do 10+25 and then divide by 2 and it will ignore the NULL value
--- Same thing will happend if we do SUM(), MIN(), MAX() and COUNT() functions, they will ignore the NULL values
+-- Same thing will happen if we do SUM(), MIN(), MAX() and COUNT() functions, they will ignore the NULL values
 --! NOTE: Only one expection of the aggregate functions is COUNT(*) function, it will count all the rows including the NULL values, but if we do COUNT(column_name) then it will count only the non-NULL values in that column
 
 -- If we do not want the NULL values to be ignored in the aggregation, then we can use ISNULL or COALESCE function to replace the NULL values with a specific value before doing the aggregation
@@ -685,7 +686,7 @@ AVG(score) OVER()AS AverageScore1, -- Ignoring the NULL values in the score colu
 AVG(COALESCE(score, 0)) OVER() AS AverageScore2 -- Considering the NULL values as 0 in the score column and calculating the average score
 from MyDatabase.dbo.customers
 
---? Handlind NULL values in string concatenation and arithmetic operations
+--? Handling NULL values in string concatenation and arithmetic operations
 -- If we do 1+5 it will give us 6, but if we do 1+NULL then it will give us NULL because any arithmetic operation with NULL will result in NULL
 -- If we do "A"+"B" it will give us "AB", but if we do "A"+NULL then it will give us NULL because any string concatenation with NULL will result in NULL
 
@@ -723,7 +724,7 @@ SELECT
 CustomerID, score,
 CASE WHEN Score IS NULL THEN 1 ELSE 0 END AS Flag
 FROM SalesDB.Sales.Customers
-ORDER BY CASE WHEN Score IS NULL THEN 1 ELSE 0 END, Score
+ORDER BY Flag ASC, Score DESC
 -- In the above query we are sorting the customers based on their scores, but since there can be NULL values in the score column, we are using a CASE statement to create a flag that indicates whether the score is NULL or not, and then we are sorting first by the flag (so that NULL values come last) and then by the score itself
 
 
@@ -760,6 +761,7 @@ FROM CTE1
 -- When we calculate the length of the Category column using the DATALENGTH function, we can see that the non-empty string has a length of 1, the NULL value has a length of NULL, the empty string has a length of 0, and the blank space has a length of 2 because it contains two space characters
 -- Performace is best for NULL values, then empty string and then blank space because blank space takes more storage than empty string and empty string takes more storage than NULL value
 -- To compare we use IS NULL for NULL values, = '' for empty strings and = ' ' for blank spaces
+
 
 --* DATA Policies for handling NULL values, empty strings and blank spaces
 -- Set of rules that defines how data should be handled
@@ -802,6 +804,8 @@ FROM CTE2
 /* Create report showing total sales for each of the following categories: High (sales over 50), Medium (sales 21-50), and Low (sales 20 or less)
 Sort the categories from highest sales to lowest */
 
+SELECT * FROM SalesDB.Sales.Orders
+
 SELECT
 Category,
 SUM(Sales) AS TotalSales
@@ -814,7 +818,7 @@ FROM (
         WHEN Sales > 20 THEN 'Medium'
         ELSE 'Low'
     END Category
-FROM SalesDB.Sales.Orders
+    FROM SalesDB.Sales.Orders
 ) AS t
 GROUP BY Category
 ORDER BY TotalSales DESC
@@ -928,6 +932,8 @@ OrderID, OrderDate, ProductID,
 SUM(Sales) OVER(PARTITION BY ProductID) AS total_sales
 FROM SalesDB.Sales.Orders
 
+SELECT * FROM SalesDB.Sales.Orders
+
 -- Syntax of window functions
 /* 
 First part is WINDOW FUNCTION, then we have the OVER() clause which defines the window of data for the function to operate on, and then we have the PARTITION BY clause which is used to divide the result set into partitions 
@@ -942,7 +948,7 @@ WINDOW FUNCTIONS are divided into three groups:
 */
 
 /*
-The COUNT FUNCTION exceptes every datatype
+The COUNT FUNCTION excepts every datatype
 SUM(), AVG(), MAX(), MIN() functions only accept numeric datatypes, if we try to use them on non-numeric datatypes then it will throw an error
 ROWNUMBER(), RANK(), DENSE_RANK(), CUME_DIST(), PERCENT_RANK() should be empty, they do not accept any arguments
 NTILE() function accepts one argument which is the number of groups to divide the data into, and it should be a positive integer
@@ -981,6 +987,8 @@ FROM SalesDB.Sales.Orders
 Lower value must be below the higher value in the frame clause, for example if we specify 3 PRECEDING as the lower frame boundary and 2 FOLLOWING as the higher frame boundary, then it will include 3 rows before the current row and 2 rows after the current row in the frame, 
 but if we specify 2 FOLLOWING as the lower frame boundary and 3 PRECEDING as the higher frame boundary, then it will throw an error because the lower value (2 FOLLOWING) is not below the higher value (3 PRECEDING) in terms of their position relative to the current row
 */
+select * from SalesDB.Sales.Orders
+
 
 SELECT
 OrderID, 
@@ -1166,7 +1174,7 @@ OrderID,
 ProductID,
 OrderDate,
 Sales,
-AVG (Sales) OVER (PARTITION BY ProductID) AvgByProduct,
+AVG(Sales) OVER (PARTITION BY ProductID) AvgByProduct,
 AVG(Sales) OVER (PARTITION BY ProductID ORDER BY OrderDate) MovingAvg,
 AVG(Sales) OVER (PARTITION BY ProductID ORDER BY OrderDate ROWS BETWEEN CURRENT ROW AND 1 FOLLOWING) RollingAvg
 FROM SalesDB.Sales.Orders
@@ -1198,7 +1206,6 @@ DENSE_RANK() OVER(ORDER BY Sales DESC) AS SalesRank_DenseRank
 FROM SalesDB.Sales.Orders
 
 -- Find the top highest sales for each product
-
 SELECT * 
 FROM (
     SELECT
@@ -1212,12 +1219,6 @@ WHERE SalesRank = 1
 -- TOP N ANALYSIS: It is a common use case of ranking functions where we want to find the top N values for each group or category in our dataset, such as finding the top 3 highest sales for each product, or the top 5 customers with the highest total sales, etc. By using the ROW_NUMBER() function along with PARTITION BY and ORDER BY clauses, we can assign a unique rank to each row within each partition (group) based on the specified order, and then filter the results to return only the top N rows for each group based on their assigned ranks.
 
 -- Find the lowest 2 customers based on their total sales
-SELECT TOP 2 CustomerID,
-SUM(Sales) AS TotalSales
-FROM SalesDB.Sales.Orders
-GROUP BY CustomerID
-ORDER BY TotalSales ASC
-
 SELECT *
 FROM (
     SELECT 
@@ -1262,7 +1263,7 @@ FROM SalesDB.Sales.Orders
 
 
 --* PERCENT_RANK() --> Calculates the relative position of each row within a window
--- Percent rank always has scale o to 1
+-- Percent rank always has scale 0 to 1
 -- PERCENT_RANK() is position number of the value - 1 / Total number of rows - 1 
 SELECT *,
 PERCENT_RANK() OVER(ORDER BY Sales DESC) AS cumulative 
@@ -1324,9 +1325,9 @@ FROM (
 
 -- Load Balancing in ETL -- Data Engineer
 -- If we want to transfer a large table from one database to other database then we can split the table into buckets and then transfer it one by one
--- And in the second databaase we can Use SET operators such as UNION to combine all the small tables into one big table
+-- And in the second databaase we can use SET operators such as UNION to combine all the small tables into one big table
 
--- -- In order to export the data, divide the orders into 2 groups.
+-- In order to export the data, divide the orders into 4 groups.
 SELECT
 NTILE(4) OVER (ORDER BY OrderID) Buckets,
 *
@@ -1350,10 +1351,9 @@ FROM SalesDB.Sales.Orders
 -- Month-over-Month (MoM) --> Analyze short-term trends and discover patterns in seasonality
 
 -- Analyze the month-over-month performance by finding the percentage change in sales between the current and previous months
-
 SELECT *,
 CASE 
-    WHEN prevMonth != 0 THEN ROUND((CAST((currentMonth - prevMonth) AS FLOAT) / prevMonth) *100, 2)
+    WHEN prevMonth != 0 THEN ROUND((CAST((currentMonth - prevMonth) AS FLOAT) / prevMonth) * 100, 2)
     ELSE 0
 END AS percentChange
 FROM(
@@ -1369,7 +1369,6 @@ FROM(
 -- Measure customer's behavior and loyalty to help businesses build strong relationships with customers
 
 -- In order to analyze customer loyalty, rank customers based on the average days between their orders
-
 SELECT
 CustomerID,
 AVG(diff) as AvgDaysBetweenOrders,
@@ -1442,22 +1441,21 @@ FROM SalesDB.Sales.Orders
 --* DATA WAREHOUSE
 -- A special database that collects data from different sources and integrates to enable analytics and support decision-making
 
-
 --* DATABASE ENGINE
 -- It is the brain of the database, executing multiple operations such as storing, retrieving, and managing data within the database
 
 /* Two main types of storage in the database are
 
 --1. Disk Storage --> Long-term memory, where data is stored permanently
-+ Capacity: can hold a large amount of data
-- Speed: slow to read and to write
+-- Capacity: can hold a large amount of data
+-- Speed: slow to read and to write
 
 Types of disk Storage
---A USER DATA STORAGE
+-- A USER DATA STORAGE
 It's the main content of the database.
 This is where the actual data that users care about is stored.
 
---B SYSTEM CATALOG
+-- B SYSTEM CATALOG
 Database's internal storage for its own information.
 A blueprint that keeps track of everything about the database itself, not the user data.
 MAIN PURPOSE -- It holds the Metadata information about the database.
@@ -1472,8 +1470,8 @@ Once these tasks are done, the storage is cleared.
 
 
 --2. Cache --> Fast short-term memory, where data is stored temporarily
-+ Speed: extremely fast to read and to write
-- Capacity: can hold smaller amout of data
+-- Speed: extremely fast to read and to write
+-- Capacity: can hold smaller amout of data
 
 
 So now let's have an example.
