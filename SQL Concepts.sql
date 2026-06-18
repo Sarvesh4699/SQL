@@ -1872,7 +1872,7 @@ WITH sequenceGenerator AS
     WHERE MyNumber < 1000 -- Breaking Condition
 )
 SELECT * FROM sequenceGenerator
-OPTION (MAXRECURSION 5000) -- Increase Max Recursion
+OPTION (MAXRECURSION 1000) -- Increase Max Recursion
 
 -- By default, maximum recursion is set to 100, however we can modify number of recursions using the above syntax and can increase max iterations
 
@@ -1898,6 +1898,17 @@ WITH CTE_Emp_Hierarchy AS (
 -- Main Query
 SELECT *
 FROM CTE_Emp_Hierarchy
+
+
+-- Fibonacci
+WITH CTE_Fib AS (
+    SELECT 1 AS Position, 0 AS CurrentVal, 1 AS NextVal
+    UNION ALL
+    SELECT Position + 1, NextVal, CurrentVal + NextVal
+    FROM CTE_Fib
+    WHERE Position < 10
+)
+SELECT Position, CurrentVal AS FibonacciValue FROM CTE_Fib;
 
 
 --* VIEW
@@ -1991,10 +2002,10 @@ CREATE VIEW Sales.V_Monthly_Summary AS
 )
 
 --* Selecting from the VIEW
-SELECT * FROM V_Monthly_Summary
+SELECT * FROM Sales.V_Monthly_Summary
 
 -- Dropping the VIEW
-DROP VIEW V_Monthly_Summary
+DROP VIEW Sales.V_Monthly_Summary
 
 
 --* Updating the VIEW
@@ -2306,8 +2317,11 @@ SELECT * FROM Sales.Monthlyorders
 SELECT * 
 INTO #Orders
 FROM Sales.Orders
+WHERE OrderStatus = 'Delivered'
 -- If we Put # before the table name, it means that it is a temporary table
 -- This is a temporary table and will only live until the session is active. Once we restart the session the temporary tables will be deleted
+
+DROP TABLE IF EXISTS #Orders
 
 SELECT * FROM #Orders
 
