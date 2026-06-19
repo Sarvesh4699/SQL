@@ -2329,5 +2329,21 @@ SELECT * FROM #Orders
 -- We use it in order to store intermediate results temporary until we are done with the session
 -- And then once we are done, the database can go and drop that temporary table
 
+--* STORED PROCEDURE
+-- First we have to define stored procedure and then we can execute it
+
+ALTER PROCEDURE GetCustomerSummary 
+@Country NVARCHAR(50) = 'USA' -- Symbol @ is used to create a parameter, and the default value is set to 'USA'
+AS
+BEGIN
+    SELECT
+        COUNT(*) AS totalCustomers,
+        AVG(Score) AS avgScore
+    FROM SalesDB.Sales.Customers
+    WHERE country = @Country
+END
+
+EXEC GetCustomerSummary @Country = 'USA'
+
 
 
