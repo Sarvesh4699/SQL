@@ -2332,18 +2332,168 @@ SELECT * FROM #Orders
 --* STORED PROCEDURE
 -- First we have to define stored procedure and then we can execute it
 
-ALTER PROCEDURE GetCustomerSummary 
+GO
+CREATE OR ALTER PROCEDURE GetCustomerSummary --* Declaration of Stored Procedure
+
+--* Parameter Declaration
 @Country NVARCHAR(50) = 'USA' -- Symbol @ is used to create a parameter, and the default value is set to 'USA'
 AS
 BEGIN
+    -- Usually we declare all the variables inside the stored procedure after the 'BEGIN' keyword and at the start of the query
+    --* Declaration of variables
+    DECLARE @firstVar INT, @secondVar FLOAT -- Declaration of variables
+
+    --* IF ELSE
+    -- Prepare & Cleanup Data
+    IF EXISTS (SELECT 1 FROM Sales.Customers WHERE Score IS NULL AND Country = @Country)
+    BEGIN
+        PRINT ('Updating NULL Scores to 0 for '+ @Country);
+        UPDATE SalesDB.Sales.Customers
+        SET Score = 0
+        WHERE Score IS NULL AND Country = @Country;
+    END
+
+    ELSE
+    BEGIN
+        PRINT ('No NULL Scores found')
+    END;
+
+
     SELECT
-        COUNT(*) AS totalCustomers,
-        AVG(Score) AS avgScore
+        @firstVar = COUNT(*), -- If you are assigning value to a variable then you cannot have alias for it
+        @secondVar = AVG(Score)
     FROM SalesDB.Sales.Customers
-    WHERE country = @Country
+    WHERE country = @Country;
+
+    PRINT 'Total Customers from ' + @Country + ' is: ' + CAST(@firstVar AS NVARCHAR); -- In print statement everything should be in string format, there cannot be dates, numbers, floats and so on
+    PRINT 'Average Score from ' + @Country + ' is: ' + CAST(@secondVar AS NVARCHAR);
+
+
+    -- We can add multiple queries in a single stored procedure
+    SELECT
+        COUNT(OrderID) AS totalOrders,
+        SUM(Sales) AS totalSales
+    FROM SalesDB.Sales.Orders o
+    INNER JOIN SalesDB.Sales.Customers c
+    ON c.CustomerID = o.CustomerID
+    WHERE c.Country = @Country;
+
+    -- If you are writing multiple queries in a single stored procedure then use semicolon afer each query ends
+
+    --* Error Handling
+    --* Try and CATCH 
+    BEGIN TRY -- The function of BEGIN TRY is that try this block of code which might throw an error
+        SELECT 1/0 AS myInt -- This will throw an error for sure as 1 cannot be divided by zero
+    END TRY
+
+    BEGIN CATCH -- SQL statements to handle the error
+        -- Error Handling
+        PRINT('An Error Occured');
+        PRINT('Error Message: ' + ERROR_MESSAGE());
+        PRINT('Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR));
+        PRINT('Error Line: ' + CAST(ERROR_LINE() AS NVARCHAR));
+        PRINT('Error in Procedure: ' + CAST(ERROR_PROCEDURE() AS NVARCHAR));
+    END CATCH
 END
+GO
 
-EXEC GetCustomerSummary @Country = 'USA'
+-- Execute the procedure in a separate batch
+EXEC GetCustomerSummary;
+EXEC GetCustomerSummary @Country = 'Germany';
 
+
+--* TRIGGERS
+-- Triggers are special stored procedures (set of statements) that automatically runs in response to a specific event on a table or view
+-- Triggers have multiple types
+-- 1. DML Triggers (INSERT, UPDATE, DELETE statements)
+--    We have two types of Triggers first is AFTER trigger (executed after the event) and second is INSTEAD OF trigger (Runs during the event)
+-- 2. DDL (CREATE, ALTER, DROP)
+-- 3. LOGGON
+
+-- Use cases is about maintaining audit logs
+-- SYNTAX
+-- CREATE TRIGGER TriggerName ON tableName
+-- We create the trigger and then we have to specify on which table we want the trigger, and then we need to define when this trigger id going to happen
+-- We need to define AFTER or INSTEAD OF and define INSERT, UPDATE, DELETE
+
+-- Creating the table where we want to keep all the logs information
+CREATE TABLE SalesDB.Sales.Employee_Logs (
+    LogID INT IDENTITY(1,1) PRIMARY KEY,
+    EmployeeID INT,
+    LogMessage VARCHAR(255),
+    LogDate DATE
+)
+
+GO
+CREATE OR ALTER TRIGGER trg_AfterInsertEmployee ON SalesDB.Sales.Employees
+AFTER INSERT
+AS
+BEGIN
+    INSERT INTO SalesDB.Sales.Employee_Logs (EmployeeID, LogMessage, LogDate)
+    SELECT EmployeeID, 'New Employee Added: ' + CAST(EmployeeID AS VARCHAR), 
+    GETDATE() FROM INSERTED
+    -- INSERTED is a virtual table that holds a copy of the rows that are being inserted into the target table, 
+    -- so whatever we are inserting into the Employees table it will be available into the INSERTED table as well and this is only available 
+    -- during the execution of the trigger 
+END
+GO
+
+SELECT * FROM SalesDB.Sales.Employee_Logs
+
+INSERT INTO SalesDB.Sales.Employees
+VALUES (6,'Harry','Kane','Finance','1988-01-12','M',120000,3)
+
+SELECT * FROM SalesDB.Sales.Employees
+
+
+
+--* INDEXES
+-- Index is a data structure that provides quick access to the rows of the data , to improve the speed of the queries. 
+
+-- INDEX Types
+-- We have different indexes in databases for different purposes
+
+--? Type 1
+-- STRUCTURE (The first one is by the structure, how the database is organizing and referencing the data)
+-- 1. Clustered Index
+-- 2. Non-Clustered Index 
+
+--? Type 2
+-- STORAGE (In this category we are talking about how the data is stored physically in the database)
+-- RowStore Index
+-- ColumnStore Index
+
+--? Type 3
+-- FUNCTIONS
+-- Unique Index
+-- Filtered Index
+
+--! Behind the scenes the database are stored in a different way
+-- It stores the data in data files on the disk and inside the data files the data is stored in blocks called pages
+-- A page is a unit of data storage in a database and it has a fixed size of 8 Kilobytes
+-- A page can store anything inside it, it can store rows of tables and columns, metadata, indexes
+-- A page has two types
+-- Data page
+-- Index page
+
+
+-- Data page
+-- The data page is divided into three sections
+-- First section is the page header where it will store key information about the metadata, like Page ID, Page Type, etc
+-- Second Section is Payload Area, this is where the actual data lies, SQL Server limits the total maximum row payload size on a single data page to 8,060 bytes. Rows are placed sequentially from the top down, starting directly below the header
+-- Third Section is Row Offset Array (Slot Array) -- This is like a quick index for the rows stored inside this page. It keeps track of where each rows begins, so that the SQL can easily locate a specific row without having SQL, like scanning the entire page in order to find a row
+
+-- HEAP STRUCTURE 
+-- In SQL Server, a heap table is a table without a clustered index. It stores the data as it is, unordered and unsorted. 
+-- INSERT operations are very fast, Finding something from this table is going to be very slow. This is a tradeoff
+
+-- For example if we want to find a particular record, specific to a ID, It will search the ID in the table row by row which means that it will scan all the data pages row by row, which means it is doing a full table scan.
+-- If it a small table then it is fine, but if the table has millions of rows then searching through the heap structure will take a lot of time, and that is the reason why we need indexes in databases
+
+SELECT * FROM sys.indexes
+
+SELECT OBJECT_NAME(object_id) AS TableName ,type 
+FROM sys.indexes 
+WHERE type = 0; -- 0 indicates a HEAP
 
 
