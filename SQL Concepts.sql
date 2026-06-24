@@ -2482,6 +2482,7 @@ SELECT * FROM SalesDB.Sales.Employees
 -- First section is the page header where it will store key information about the metadata, like Page ID, Page Type, etc
 -- Second Section is Payload Area, this is where the actual data lies, SQL Server limits the total maximum row payload size on a single data page to 8,060 bytes. Rows are placed sequentially from the top down, starting directly below the header
 -- Third Section is Row Offset Array (Slot Array) -- This is like a quick index for the rows stored inside this page. It keeps track of where each rows begins, so that the SQL can easily locate a specific row without having SQL, like scanning the entire page in order to find a row
+-- It uses exactly 2 bytes per row. It acts as a map or pointer index. Each 2-byte slot indicates the exact byte offset distance from the start of the page to where that specific data row begins
 
 -- HEAP STRUCTURE 
 -- In SQL Server, a heap table is a table without a clustered index. It stores the data as it is, unordered and unsorted. 
@@ -2490,10 +2491,42 @@ SELECT * FROM SalesDB.Sales.Employees
 -- For example if we want to find a particular record, specific to a ID, It will search the ID in the table row by row which means that it will scan all the data pages row by row, which means it is doing a full table scan.
 -- If it a small table then it is fine, but if the table has millions of rows then searching through the heap structure will take a lot of time, and that is the reason why we need indexes in databases
 
+
 SELECT * FROM sys.indexes
 
 SELECT OBJECT_NAME(object_id) AS TableName ,type 
 FROM sys.indexes 
 WHERE type = 0; -- 0 indicates a HEAP
 
+--* CLUSTERED INDEX
+-- Let's say you create a clustered index on the ID column of table customers, first thing that will happen is SQL is physically sort all the data based on column ID.
+-- So the rows are rearranges in each data page in ascending order. So in first datapage there will be rows with ID 1,2,3,4.... and so on and in last data page the ending column IDs will be there
+-- The next step is SQL will building a B-Tree. A B-Tree is short form of balanced tree, it is hierarchical structure that stores data upside down, It starts with the root node, and it keeps branching out
+-- to form the leaf nodes. Between the leaf nodes and the root node their are intermediate nodes, so there can be one level of multiple level of intermediate nodes. Once B-tree is constructed then SQL can navigate
+-- through the B-Tree to find specific information. It is very important to understand that the leaf nodes of the B-Tree contains the actual data, data pages. All the data is stored at leaf nodes, then SQL starts building the intermediate nodes
+-- So in imtermediate nodes the database uses different pages which is called as Index page, we cannot find the actual data in this, but it stores key value that contains a pointer to another index page or to a data page. We do not have a pointer for each row,
+-- we do have a pointer for each cluster, that is why it is called it is as Clustered index.
+-- Once SQL is done building the intermediate node, then SQL will now make the root node.
 
+
+SELECT
+   DB_NAME(database_id), 
+   SUM(free_space_in_bytes) / 1024 AS 'Free_KB'
+FROM sys.dm_os_buffer_descriptors
+WHERE database_id <> 32767
+GROUP BY database_id
+ORDER BY SUM(free_space_in_bytes) DESC
+
+--* NON CLUSTERED INDEX
+-- At the begining we are at the HEAP structure where the table does not have any index and the data is stored randomly inside the data pages.
+-- If we go and create a non clustered index, the big difference is SQL will not touch the physical actual data on the data pages. The data pages going to stay as it is and nothing is going to change.
+-- The SQL will start building the B-Tree Structure, so first it will build an index page, this index page is a little bit different from the Clustered index, in this we can store pointers.
+-- This time it is going to store the key customer ID, and one customerID will be associated with a value of the pointer. The pointer will be the exact address where the specific row is located corresponding to the cusomterID.
+-- The address will be the FileID, Page number and the row offset to locate the row exactly. This whole thing is called the RID which is the Row Identifier. The first part of the RID is matching to the data page and second part is the row offset
+-- SQL will go on and continue and assign each customerID with a RID (A pointer to the exact location)
+-- We can see that in the index page, we don't have like a pointer for each group of customers, like we had in the clusters index, we have now a pointer for each ID.
+-- This type of index page we call is row locator page
+-- Those index pages that has the row identifier is going to be stored at the leaf level of the B-tree. So at the leaf level we don't have the actual data, the data pages. We have index pages where we have pointers to the actual data.
+-- SQL will now start building the intermediate nodes. It's exactly like the clustered index where it's going to point to another index page.
+-- Finally it will make the root node.
+-- This is again called the B-Tree structure. But the data pages are not a part of B-Tree structure
