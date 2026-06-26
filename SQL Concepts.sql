@@ -3146,5 +3146,248 @@ CREATE INDEX idx_DBCustomers_CountryScore ON SalesDB.Sales.DBCustomers (Country,
 -- Querying only a subset? -> FILTERED INDEX
 -- Prevent duplicates? -> UNIQUE INDEX
 
--- INDEX MANAGEMENT
+--* INDEX MANAGEMENT
+
+--* List of all the indexes on a specific table
 sp_helpindex 'Sales.DBCustomers' -- This is a stored procedure which takes one argument as the table name. It gives information of the indexes in a table
+
+--* Monitoring Index Usage
+--? In SQL Server we have a special schema called sys where you can find a lot of metadata information about SQL Server (Contians metadata about database tables, views, indexes, etc...)
+
+SELECT * FROM sys.indexes
+
+SELECT
+object_id,
+name AS IndexName, type_desc AS IndexType, is_primary_key AS IsPrimarykey, is_unique AS IsUnique, is_disabled AS IsDisabled
+FROM sys.indexes idx
+
+SELECT
+tbl.name AS TableName,
+idx.name AS IndexName,
+idx.type_desc AS IndexType,
+idx.is_primary_key AS IsPrimarykey,
+idx.is_unique AS IsUnique, 
+idx.is_disabled AS IsDisabled,
+s.user_seeks,
+s.user_scans,
+s.user_lookups,
+s.user_updates,
+COALESCE(s.last_user_seek, s.last_user_scan) AS LastUpdate
+FROM sys.indexes idx
+JOIN sys.tables tbl
+ON idx.object_id = tbl.object_id
+LEFT JOIN sys.dm_db_index_usage_stats s
+ON s.object_id = idx.object_id AND s.index_id = idx.index_id
+ORDER BY tbl.name, idx.name
+
+-- DMV (Dynamic Management View) Provides real-time insights into Database performance and system health
+SELECT * FROM sys.dm_db_index_usage_stats
+
+SELECT * FROM sys.dm_db_missing_index_details -- To get suggestions of where to make index according to queries.
+
+--* UPDATING STATISTICS
+-- Statistics are used by the SQL Server query optimizer to determine the most efficient way to execute a query. They provide information about the distribution of data in a table or index, which helps the optimizer make informed decisions about query execution plans.
+
+SELECT
+SCHEMA_NAME(t.schema_id) AS SchemaName,
+t.name AS TableName,
+s.name AS StatisticName, sp.last_updated As LastUpdate,
+DATEDIFF(day, sp.last_updated, GETDATE()) As LastUpdateDay,
+sp.rows AS 'Rows',
+sp.modification_counter AS ModificationsSinceLastUpdate
+FROM sys.stats AS s
+JOIN sys.tables t
+ON s.object_id = t.object_id
+CROSS APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) AS sp
+ORDER BY sp.modification_counter DESC;
+
+UPDATE STATISTICS SalesDB.Sales.DBCustomers WITH FULLSCAN -- This will update the statistics of the table DBCustomers with full scan of the data
+
+UPDATE STATISTICS Sales.DBCustomers _WA_Sys_00000005_35BCFE0A -- Updates a specific index statistics by providing the name of the index. This is useful when you want to update statistics for a specific index rather than the entire table.
+
+EXEC sp_updatestats -- This will update the statistics of all the tables in the database. It is a system stored procedure that updates the statistics for all user-defined and internal tables in the current database.
+
+
+--* MONITORING FRAGMENTATION
+-- Fragmentation occurs when the logical order of data pages does not match the physical order on disk
+
+SELECT
+tbl.name AS TableName,
+idx.name AS IndexName,
+s.avg_fragmentation_in_percent,
+s.page_count
+FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') AS s
+INNER JOIN sys.tables tbl
+ON s.object_id = tbl.object_id
+INNER JOIN sys.indexes AS idx
+ON idx.object_id = s.object_id
+AND idx.index_id = s.index_id
+ORDER BY s.avg_fragmentation_in_percent DESC
+
+-- INDEX FRAGMENTATION:
+-- Over time INSERT, UPDATE, DELETE operations can make indexes fragmented.
+--
+-- Fragmentation means:
+-- - Data pages are not stored in logical order
+-- - Empty/unused spaces exist
+-- - Index performance decreases
+-- - Queries become slower
+
+
+--------------------------------------------------
+
+
+-- CHECK INDEX HEALTH:
+-- Use Dynamic Management Function to check fragmentation
+SELECT * FROM sys.dm_db_index_physical_stats(DB_ID(),NULL,NULL,NULL,NULL);
+
+-- Important column:
+-- avg_fragmentation_in_percent
+--
+-- 0%    = Healthy index
+-- 100%  = Highly fragmented index
+
+
+--------------------------------------------------
+
+
+-- FIXING FRAGMENTATION:
+-- SQL Server provides two methods:
+
+
+-- 1. REORGANIZE
+-- Lightweight operation
+--
+-- - Defragments leaf level pages
+-- - Sorts index order again
+-- - Does not block users
+-- - Faster operation
+--
+-- Use when fragmentation:
+-- 10% - 30%
+ALTER INDEX idx_DBCustomers_CustomerID ON SalesDB.Sales.DBCustomers REORGANIZE -- This will reorganize the index, which is a lighter operation that defragments the leaf level of the index pages. It is less resource-intensive and can be done online without locking the table.
+
+
+--------------------------------------------------
+
+
+-- 2. REBUILD
+-- Heavyweight operation
+--
+-- - Drops the old index
+-- - Creates index again from scratch
+-- - Removes fragmentation completely
+-- - Fixes page space issues
+-- - Takes more time
+--
+-- Use when fragmentation:
+-- > 30%
+ALTER INDEX idx_DBCustomers_CustomerID ON SalesDB.Sales.DBCustomers REBUILD -- This will rebuild the index, which is a more intensive operation that drops and recreates the index. It can be done offline or online, depending on the SQL Server edition and settings. Rebuilding an index can improve performance by eliminating fragmentation and updating statistics.
+
+--------------------------------------------------
+
+-- RECOMMENDED APPROACH:
+--
+-- Fragmentation 0% - 10% -> Do nothing
+-- Fragmentation 10% - 30% -> REORGANIZE index
+-- Fragmentation > 30% -> REBUILD index
+
+--------------------------------------------------
+
+-- INDEX MAINTENANCE CHECKLIST:
+--
+-- 1. Monitor index fragmentation
+-- 2. Check missing indexes
+-- 3. Keep database statistics updated
+-- 4. Reorganize/Rebuild unhealthy indexes
+-- 5. Monitor index usage
+
+-- Goal:
+-- Healthy indexes = Faster queries + Better performance
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
