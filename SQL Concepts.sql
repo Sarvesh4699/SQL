@@ -2530,3 +2530,621 @@ ORDER BY SUM(free_space_in_bytes) DESC
 -- SQL will now start building the intermediate nodes. It's exactly like the clustered index where it's going to point to another index page.
 -- Finally it will make the root node.
 -- This is again called the B-Tree structure. But the data pages are not a part of B-Tree structure
+
+
+--! You can create only one CLUSTERED Index on the table.
+-- This makes sense because we can only sort the data physically only once.
+--! You can create any number of non clustered index
+
+-- ==========================================================
+-- CLUSTERED INDEX vs NON-CLUSTERED INDEX
+-- ==========================================================
+
+--                  CLUSTERED INDEX              NON-CLUSTERED INDEX
+-- --------------------------------------------------------------------
+-- Definition        Physically sorts and          Separate index structure
+--                   stores table rows             with pointers to data
+--
+-- Number             Only 1 per table              Multiple allowed
+--
+-- Read Speed         Faster                        Slower
+--                   (direct data access)           (extra intermediate node)
+--
+-- Write Speed        Slower                        Faster
+--                   (rows may reorder)             (data order unchanged)
+--
+-- Storage            More storage efficient        Requires extra storage due to index pages
+--
+-- Best Used For      Primary Key, Unique           WHERE conditions,
+--                   columns, range queries         JOINs, exact searches
+--
+-- Example            Employee_ID                  Department, Email
+
+
+
+--* SYNTAX 
+/*CREATE [CLUSTERED | NONCLUSTERED] INDEX index_name ON
+table_name (column 1, column 2, ...)
+*/ -- By default it is NONCLUSTERED Index
+-- Index with multiple columns is called as COMPOSITE Index
+
+SELECT * 
+INTO SalesDB.Sales.DBCustomers
+FROM SalesDB.Sales.Customers
+
+CREATE CLUSTERED INDEX idx_DBCustomers_CustomerID ON SalesDB.Sales.DBCustomers (CustomerID)
+
+SELECT * FROM SalesDB.Sales.DBCustomers
+WHERE CustomerID = 2
+-- As per the query plan SQL database engine is using the Clustered Index Seek
+-- If clustered index was not there then to search for the specific record SQL database engine would do full table scan
+
+-- DROP 
+DROP INDEX idx_DBCustomers_CustomerID ON SalesDB.Sales.DBCustomers
+
+SELECT * FROM SalesDB.Sales.DBCustomers
+WHERE LastName = 'Brown'
+-- If you find yourself using this query a lot of times then you can go ahead and make a non clustered index
+
+CREATE NONCLUSTERED INDEX idx_DBCustomers_LastName ON SalesDB.Sales.DBCustomers (LastName)
+
+DROP INDEX idx_DBCustomers_LastName ON SalesDB.Sales.DBCustomers
+
+
+-- COMPOSITE INDEX
+SELECT * FROM SalesDB.Sales.DBCustomers
+WHERE Country = 'USA' AND Score > 500
+-- The columns of index must match the order in your query
+
+CREATE INDEX idx_DBCustomers_CountryScore ON SalesDB.Sales.DBCustomers (Country, Score)
+
+-- Leftmost Prefix Rule
+-- Index works only if your query filters start from the first column in the index and follow its order.
+
+-- A,B,C,D (Order of Index)
+-- Index will be used
+-- A
+-- A,B
+-- A,B,C
+
+-- Index won't be used
+-- B
+-- A,C (You canont skip one column in between, index will not work)
+-- A,B,D
+
+
+--* INDEX BY STORAGE
+
+--* ROWSTORE INDEX
+-- If we use rowstore index, our table will be split into multiple rows, and each group of rows will be stored inside a data page.
+-- We are organising the data row by row, which means all the columns will be stored in each row
+
+--* COLUMNSTORE INDEX
+-- In column store, SQL will split your table into multiple separate columns
+
+-- Column Store Index in SQL Server
+
+-- Example table:
+-- Customer(ID, Name, Status)
+-- Rows: ~2 million customers
+
+-- Default storage:
+-- Table is stored as HEAP (row-by-row) inside data pages.
+
+
+-- Step 1: Create Row Groups
+-- SQL Server divides rows into row groups (~1 million rows each)
+-- Example:
+-- Row Group 1 -> First 1 million rows
+-- Row Group 2 -> Second 1 million rows
+--
+-- Purpose:
+-- - Enables parallel processing
+-- - Improves query performance
+
+
+-- Step 2: Column Segmentation
+-- Each row group is divided by columns
+--
+-- Example:
+-- Row Group 1:
+--   ID segment
+--   Name segment
+--   Status segment
+--
+-- This creates the "column store" format.
+
+
+-- Step 3: Data Compression
+-- Main reason column store is fast.
+--
+-- Example:
+-- Status column:
+-- Active
+-- Inactive
+-- Active
+-- Active
+--
+-- SQL creates a dictionary:
+--
+-- Dictionary:
+-- Active   -> 1
+-- Inactive -> 2
+--
+-- Stored data:
+-- 1 2 1 1
+--
+-- Benefits:
+-- - Less storage
+-- - Faster scans
+-- - Better analytics performance
+
+
+-- Step 4: Storage using LOB (Large Object) Pages
+-- Column store does NOT use normal data pages.
+-- It uses LOB pages.
+
+
+-- LOB Page Structure:
+--
+-- Page Header
+--    |
+-- Segment Header
+--    |
+--    |-- Segment ID
+--    |-- Row Group ID
+--    |-- Column ID
+--    |-- Dictionary Page Reference
+--
+-- Data Stream
+--    |
+--    |-- Compressed column values
+
+
+-- Dictionary Page:
+-- Stores mapping between original values and compressed values.
+--
+-- Example:
+-- Active -> 1
+-- Inactive -> 2
+
+
+-------------------------------------------------
+
+-- Clustered Column Store Index
+
+-- Completely replaces the original table storage.
+-- No B-Tree structure is created.
+--
+-- Table becomes:
+--
+-- Column Store Format
+--    |
+--    |-- Row Groups
+--    |-- Column Segments
+--    |-- Compressed Data
+--
+-- All columns are stored in columnar format.
+
+
+-------------------------------------------------
+
+-- Non-Clustered Column Store Index
+
+-- Works as an additional structure on top of the existing table.
+--
+-- Original table remains:
+--
+-- Row Store Table
+--        +
+-- Column Store Index
+--
+-- Does NOT replace the original table.
+
+
+-- Example:
+-- Original table:
+-- Customer(ID, Name, Status)
+--
+-- Create column store only on:
+-- Status column
+--
+-- Non-clustered column store index:
+-- Status -> Column Store Format
+
+
+-------------------------------------------------
+
+-- Clustered vs Non-Clustered Column Store Index
+
+-- Clustered:
+-- - Replaces table
+-- - Stores entire table as column store
+-- - No separate row storage remains
+
+-- Non-Clustered:
+-- - Additional index
+-- - Original table remains unchanged
+-- - Can include selected columns only
+
+
+-- Column Store is mainly optimized for:
+-- - Large datasets
+-- - Analytics queries
+-- - Aggregations
+-- - Data warehouse workloads
+
+--x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-
+
+-- ============================================
+-- ROWSTORE vs COLUMNSTORE INDEX (Summary)
+-- ============================================
+
+-- WHY COLUMNSTORE?
+-- Designed for analytics workloads (OLAP)
+-- Optimizes large aggregations and scans on huge tables
+-- Used by SQL Server, Power BI, Tableau, Data Warehouses
+
+-- ============================================
+-- ROWSTORE INDEX
+-- ============================================
+
+-- Data stored row-by-row
+-- Each row contains all column values together
+
+-- Example:
+-- [ID | Name | Status]
+-- [1  | John | Active]
+-- [2  | Mike | Inactive]
+
+-- Query:
+-- SELECT COUNT(*)
+-- FROM Customers
+-- WHERE Status = 'Active';
+
+-- Execution:
+-- 1. Read every row (ID, Name, Status)
+-- 2. Filter Status = Active
+-- 3. Perform COUNT()
+
+-- Drawback:
+-- Reads unnecessary columns (ID, Name)
+-- Higher I/O and slower for analytics queries
+
+-- Best for:
+-- OLTP systems
+-- Banking, e-commerce, transactional applications
+-- Frequent INSERT, UPDATE, DELETE operations
+
+-- Characteristics:
+-- ✔ Balanced read/write performance
+-- ✔ Fast transactions
+-- ✖ More storage usage
+-- ✖ Slower large-scale analytics
+
+-- ============================================
+-- COLUMNSTORE INDEX
+-- ============================================
+
+-- Data stored column-by-column
+
+-- Example:
+-- ID Column     -> [1,2,3,4,5]
+-- Name Column   -> Dictionary compressed
+-- Status Column -> Dictionary compressed
+-- Active   = 1
+-- Inactive = 2
+
+-- Query:
+-- SELECT COUNT(*)
+-- FROM Customers
+-- WHERE Status = 'Active';
+
+-- Execution:
+-- 1. Read only Status column
+-- 2. Use dictionary values
+-- 3. Filter Active rows
+-- 4. Perform COUNT()
+
+-- Advantage:
+-- Reads only required columns
+-- Much lower I/O
+-- Faster aggregations and scans
+
+-- Compression:
+-- Uses dictionary encoding
+-- Reduces storage significantly
+
+-- Best for:
+-- OLAP systems
+-- Data Warehouses
+-- Data Lakes
+-- Business Intelligence
+-- Reporting & Analytics
+
+-- Characteristics:
+-- ✔ Excellent read performance
+-- ✔ High compression ratio
+-- ✔ Low disk I/O
+-- ✔ Fast aggregations
+-- ✖ Slower INSERT/UPDATE operations
+
+-- ============================================
+-- COMPARISON
+-- ============================================
+
+-- Storage Structure
+-- Rowstore    -> Row-by-row
+-- Columnstore -> Column-by-column
+
+-- Storage Efficiency
+-- Rowstore    -> Higher storage usage
+-- Columnstore -> Compressed, lower storage
+
+-- Read Performance
+-- Rowstore    -> Good
+-- Columnstore -> Excellent for analytics
+
+-- Write Performance
+-- Rowstore    -> Fast
+-- Columnstore -> Slower
+
+-- Disk I/O
+-- Rowstore    -> Reads many unnecessary columns
+-- Columnstore -> Reads only required columns
+
+-- Best Workload
+-- Rowstore    -> OLTP (Transactions)
+-- Columnstore -> OLAP (Analytics)
+
+-- Use Cases
+-- Rowstore    -> Banking, E-commerce, CRUD apps
+-- Columnstore -> Reporting, BI, Data Warehouses
+
+-- RULE OF THUMB:
+-- If your workload is transaction-heavy → Use ROWSTORE
+-- If your workload is analytics/reporting-heavy → Use COLUMNSTORE
+
+--* CREATING COLUMNSTORE INDEX
+--* SYNTAX 
+-- CREATE [CLUSTERED | NONCLUSTERED] [COLUMNSTORE] INDEX index_name -- ROWSTORE is default
+-- ON table_name (columni, column2, ...)
+
+--! Rules: You can't specific columns in Clustered Index Columnstore
+--! You can create only one columnstore index for each table
+
+--* STORAGE EFFICIENCY
+-- 1 - Columnstore Index
+-- 2 - Heap Table
+-- 3 - Rowstore Clustered Index
+
+--* UNIQUE INDEX
+-- It ensures no duplicate values exist in specific column
+
+-- UNIQUE INDEX:
+-- Special index type that prevents duplicate values in a column.
+
+-- Why use UNIQUE INDEX?
+-- 1. Data Integrity:
+--    Ensures columns like Email, ProductID, etc. contain only unique values.
+--    Prevents accidental duplicate records.
+
+-- 2. Query Performance:
+--    Faster searches because SQL knows only one matching row can exist.
+--    Once the value is found, SQL stops searching.
+
+-- Trade-off:
+--    WRITE operations (INSERT/UPDATE) become slightly slower
+--    because SQL must check uniqueness before storing data.
+--
+--    READ operations become faster because data is guaranteed to be unique.
+
+
+-- Syntax:
+-- CREATE UNIQUE NONCLUSTERED INDEX index_name ON table_name(column_name);
+
+-- Normal Index:
+-- Duplicates are allowed
+-- CREATE INDEX idx_product_name ON Sales.Products(ProductName);
+
+-- Unique Index:
+-- Duplicates are NOT allowed
+-- CREATE UNIQUE NONCLUSTERED INDEX idx_product_name ON Sales.Products(ProductName);
+
+-- Example:
+-- Creating unique index on ProductName
+-- CREATE UNIQUE NONCLUSTERED INDEX idx_products_name ON Sales.Products(ProductName);
+
+-- Works because ProductName values are unique.
+-- If we insert duplicate data:
+-- INSERT INTO Sales.Products(ProductID, ProductName) VALUES (106, 'Caps');
+-- Error:
+-- Cannot insert duplicate value because ProductName
+-- has a UNIQUE INDEX.
+
+-- Key Point:
+-- Use UNIQUE INDEX when a column must always contain unique values.
+-- Example: Email, CustomerID, ProductID, Username
+
+
+--* FILTER INDEX
+-- FILTERED INDEX:
+-- A filtered index is a non-clustered index that stores only rows
+-- matching a specific condition (WHERE clause).
+
+-- Example:
+-- Instead of indexing all customers: USA, Germany, India
+-- We create an index only for:
+-- Country = 'USA'
+
+-- Benefits:
+-- 1. Faster Queries:
+--    Smaller B-tree structure = faster search
+--    Only relevant rows are scanned.
+
+-- 2. Less Storage:
+--    Index contains fewer rows, so it requires less space.
+
+-- 3. Targeted Optimization:
+--    Useful when queries frequently filter on the same condition.
+--    Example: Active customers, USA customers, Recent orders.
+
+
+-- Syntax:
+
+-- CREATE NONCLUSTERED INDEX index_name ON table_name(column_name)
+-- WHERE condition;
+
+
+-- Example:
+-- Most queries use:
+-- WHERE Country = 'USA'
+
+-- CREATE NONCLUSTERED INDEX idx_customer_country ON Sales.Customers(Country)
+-- WHERE Country = 'USA';
+
+
+-- Result:
+-- Index contains only USA customers.
+-- Other countries are not stored in this index.
+
+-- Query using the filtered index:
+-- SELECT * FROM Sales.Customers
+-- WHERE Country = 'USA';
+
+-- SQL can use the filtered index
+-- because the required rows exist inside it.
+
+-- Query not using the filtered index:
+
+-- SELECT * FROM Sales.Customers
+-- WHERE Country = 'Germany';
+
+
+-- Germany rows are not part of the index,
+-- so SQL cannot use this filtered index.
+
+
+-- Restrictions:
+-- ❌ Cannot create filtered index on Clustered Index
+--    (Clustered index stores the entire table order)
+
+-- ❌ Cannot create filtered index on Columnstore Index
+
+-- ✅ Works with Non-Clustered Index only
+
+-- ✅ Can combine with UNIQUE:
+
+-- CREATE UNIQUE NONCLUSTERED INDEX idx_unique_email ON Customers(Email)
+-- WHERE Status = 'Active';
+
+-- Key Point:
+-- Filtered Index = Smaller index + Faster queries + Less storage
+-- Use when you repeatedly query a specific subset of data.
+
+
+--* HOW TO CHOOSE THE RIGHT INDEX
+
+-- 1. HEAP (No Index)
+-- Default table structure without indexes.
+-- Use when:
+-- - Need very fast INSERT operations
+-- - Data is temporary or staging data
+-- - Table is not frequently queried
+-- Example:
+-- ETL staging tables
+
+--------------------------------------------------
+
+-- 2. CLUSTERED INDEX (Row Store)
+-- Physically sorts and stores table data.
+
+-- Use when:
+-- - Column is a Primary Key (default choice)
+-- - Data sorting is important
+-- - Frequent row lookups are needed
+
+-- Example:
+-- CustomerID, OrderDate
+
+-- Commonly used in: OLTP systems
+
+--------------------------------------------------
+
+-- 3. COLUMNSTORE INDEX
+-- Stores data by columns instead of rows.
+
+-- Use when:
+-- - Large tables
+-- - Complex analytical queries
+-- - Aggregations (SUM, AVG, COUNT)
+-- - Data warehouse/reporting workloads
+
+-- Benefits:
+-- - Faster analytics
+-- - Better compression
+-- - Reduces storage size
+
+-- Commonly used in:
+-- OLAP systems
+-- (Business Intelligence, Data Warehousing)
+
+--------------------------------------------------
+
+-- 4. NON-CLUSTERED INDEX
+-- Separate index structure pointing to table data.
+
+-- Use when:
+-- - Searching non-primary key columns
+-- - Foreign keys
+-- - JOIN columns
+-- - WHERE clause filters
+
+-- Example:
+-- Email, CustomerName, Country
+
+--------------------------------------------------
+
+-- 5. FILTERED INDEX
+-- Non-clustered index containing only rows
+-- that satisfy a condition.
+
+-- Use when:
+-- - Queries always focus on a subset of data
+-- - Full table index is too large
+
+-- Benefits:
+-- - Smaller index
+-- - Less storage
+-- - Faster targeted queries
+
+--------------------------------------------------
+
+-- 6. UNIQUE INDEX
+-- Ensures no duplicate values exist.
+
+-- Use when:
+-- - Data must be unique
+-- - Need data integrity
+
+-- Examples:
+-- Email
+-- ProductID
+-- Username
+
+-- Benefits:
+-- - Prevents duplicate records
+-- - Slightly improves search performance
+
+--------------------------------------------------
+
+-- QUICK SUMMARY:
+-- Need fast INSERTS? -> HEAP
+-- Primary Key / Sorting? -> CLUSTERED INDEX
+-- Large analytics / Reporting? -> COLUMNSTORE INDEX
+-- Search / JOIN / WHERE columns? -> NON-CLUSTERED INDEX
+-- Querying only a subset? -> FILTERED INDEX
+-- Prevent duplicates? -> UNIQUE INDEX
+
+-- INDEX MANAGEMENT
+sp_helpindex 'Sales.DBCustomers' -- This is a stored procedure which takes one argument as the table name. It gives information of the indexes in a table
