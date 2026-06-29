@@ -3306,15 +3306,428 @@ ALTER INDEX idx_DBCustomers_CustomerID ON SalesDB.Sales.DBCustomers REBUILD -- T
 -- Healthy indexes = Faster queries + Better performance
 
 
+--* EXECUTION PLAN
+
+SELECT * FROM Sales.Customers -- CLUSTERED INDEX SCAN
+
+SELECT * 
+INTO Sales.Customers_HP
+FROM Sales.Customers 
+
+SELECT * FROM Sales.Customers_HP -- HEAP SCAN (TABLE SCAN)
+
+SELECT * FROM Sales.Customers
+WHERE CustomerID = 2 -- CLUSTERED INDEX SEEK
+
+-- EXECUTION PLAN:
+-- A tool used to understand how SQL Server executes a query step-by-step.
+-- Helps identify performance issues and decide where to create indexes.
 
 
+--------------------------------------------------
 
 
+-- Query Execution Flow:
+--
+-- 1. SQL creates an execution plan
+--    - Based on query + database statistics
+--
+-- 2. SQL executes the plan
+--    - Reads data
+--    - Joins tables
+--    - Filters/sorts/aggregates data
+--
+-- 3. Execution plan can be stored in cache
+--    - Similar queries can reuse the plan faster
 
 
+--------------------------------------------------
 
 
+-- WHY USE EXECUTION PLAN?
+--
+-- Find:
+-- - Slow operations
+-- - Missing indexes
+-- - Wrong index usage
+-- - Expensive joins/sorts/scans
 
+
+--------------------------------------------------
+
+
+-- TYPES OF EXECUTION PLANS:
+
+
+-- 1. Estimated Execution Plan
+--
+-- Shows SQL's prediction BEFORE running query.
+-- Does not execute the query.
+
+
+-- 2. Actual Execution Plan
+--
+-- Shows the real plan AFTER query execution.
+-- Most commonly used for optimization.
+
+
+-- 3. Live Query Statistics
+--
+-- Shows execution progress in real time.
+
+
+--------------------------------------------------
+
+
+-- HOW TO READ EXECUTION PLAN:
+--
+-- Read from RIGHT to LEFT
+--
+-- Data Source  --->  Processing  --->  Result
+
+
+--------------------------------------------------
+
+
+-- COMMON OPERATORS:
+
+
+-- TABLE SCAN:
+-- Reads entire heap table.
+-- Slow for large tables.
+
+-- Example:
+-- Heap without indexes
+
+
+-- CLUSTERED INDEX SCAN:
+-- Reads data from clustered index.
+-- Can scan full table or part of index.
+
+
+-- INDEX SEEK:
+-- BEST operation.
+--
+-- SQL directly finds required rows using index.
+-- Reads only needed data.
+
+
+-- INDEX SCAN:
+-- Reads many rows from index.
+-- Better than table scan but slower than seek.
+
+
+--------------------------------------------------
+
+
+-- COST INFORMATION:
+--
+-- Execution plan shows:
+-- - CPU Cost
+-- - I/O Cost
+-- - Operator Cost %
+--
+-- Higher percentage = bigger performance problem
+
+
+--------------------------------------------------
+
+
+-- INDEX VALIDATION:
+--
+-- After creating an index:
+--
+-- 1. Run query
+-- 2. Open execution plan
+-- 3. Check if SQL uses your index
+--
+-- If not:
+-- -> Index may not be useful
+
+
+--------------------------------------------------
+
+
+-- KEY LOOKUP:
+--
+-- Happens when:
+-- - Index finds matching rows
+-- - But required columns are missing
+--
+-- SQL goes back to table to fetch remaining columns.
+
+
+-- Index finds CarrierTrackingNumber
+-- Lookup gets remaining columns
+
+
+--------------------------------------------------
+
+
+-- JOINS IN EXECUTION PLAN:
+--
+-- Nested Loop:
+-- Good for small datasets
+--
+-- Merge Join:
+-- Good when both inputs are sorted
+--
+-- Hash Join:
+-- Good for large datasets
+
+
+--------------------------------------------------
+
+
+-- COLUMNSTORE INDEX:
+--
+-- Best for:
+-- - Large tables
+-- - Aggregations
+-- - Data warehouse queries
+--
+-- Benefits:
+-- - Compression
+-- - Less I/O
+-- - Faster analytics
+
+
+--------------------------------------------------
+
+
+-- EXECUTION PLAN OPTIMIZATION PROCESS:
+--
+-- 1. Check slow query
+--
+-- 2. Open actual execution plan
+--
+-- 3. Find expensive operator
+--
+-- 4. Create/modify index
+--
+-- 5. Run query again
+--
+-- 6. Compare execution plans
+
+
+--------------------------------------------------
+
+
+-- KEY TAKEAWAY:
+--
+-- Execution Plan = SQL Server's roadmap
+--
+-- Use it to understand:
+-- - How SQL reads data
+-- - Which indexes are used
+-- - Where performance bottlenecks exist
+--
+-- Right index + Execution Plan
+-- = Faster queries
+
+--* SQL HINTS
+-- Used to manually control SQL Server's execution plan.
+-- Normally SQL Server decides:
+-- - Which index to use
+-- - Which join method to use
+-- - How to read data
+--
+-- Decision is based on:
+-- - Statistics
+-- - Indexes
+-- - Query structure
+
+--------------------------------------------------
+
+-- WHY USE SQL HINTS?
+
+-- Sometimes SQL chooses a bad execution plan because:
+-- - Statistics are outdated
+-- - Too many indexes exist
+-- - Query optimizer makes wrong assumptions
+
+-- Hints allow us to override SQL's decision.
+
+--------------------------------------------------
+
+-- 1. FORCE JOIN TYPE
+
+-- Example:
+-- SQL uses Nested Loop but tables are very large.
+-- We can force Hash Join.
+
+
+SELECT *
+FROM Sales.Orders o
+JOIN Sales.Customers c
+ON o.CustomerID = c.CustomerID
+OPTION (HASH JOIN); -- SQL now uses Hash Join instead of choosing itself.
+
+--------------------------------------------------
+
+-- 2. FORCE INDEX SEEK
+-- Tells SQL to use index seek instead of scan.
+
+SELECT *
+FROM Sales.Customers WITH (FORCESEEK)
+WHERE CustomerID = 10;
+
+-- Forces SQL to directly find rows
+-- instead of scanning many rows.
+
+--------------------------------------------------
+
+-- 3. FORCE SPECIFIC INDEX
+-- Tell SQL exactly which index to use.
+
+SELECT *
+FROM Sales.Customers WITH (INDEX(PK_customers))
+WHERE CustomerID = 10;
+-- SQL uses the specified index.
+
+--------------------------------------------------
+
+-- WITHOUT HINTS:
+-- SQL chooses execution plan automatically.
+
+SELECT *
+FROM Sales.Orders;
+
+-- SQL decides:
+-- - Scan or seek
+-- - Join type
+-- - Index usage
+
+--------------------------------------------------
+
+-- SQL HINTS BENEFITS:
+-- More control over execution plan
+-- Can improve slow queries temporarily
+-- Useful for troubleshooting
+
+--------------------------------------------------
+
+-- IMPORTANT WARNINGS:
+-- Do NOT use hints as a permanent solution.
+-- A hint that works in development may fail in production because:
+-- - Data size is different
+-- - Statistics are different
+-- - Indexes are different
+-- Always test hints in each environment.
+
+--------------------------------------------------
+
+-- BEST PRACTICE:
+-- Use hints as a temporary workaround.
+-- Find the real issue:
+-- - Update statistics
+-- - Fix indexes
+-- - Optimize query
+-- Then remove the hint.
+
+--------------------------------------------------
+
+-- KEY TAKEAWAY:
+-- SQL Hints = Override SQL optimizer decisions
+-- Powerful tool 
+-- Use carefully 
+-- Only when SQL chooses a bad execution plan.
+
+--* PARTITIONS 
+-- Partitioning is a database design technique that divides a large table into smaller, more manageable pieces called partitions. Each partition can be stored separately, often on different filegroups or storage devices. This can improve query performance, manageability, and maintenance of large datasets.
+
+--! STEP 1: Creating PARTITION FUNCTION
+
+CREATE PARTITION FUNCTION PartitionByYear (DATE)
+AS RANGE LEFT FOR VALUES ('2023-12-31','2024-12-31','2025-12-31')
+
+-- Query to check the partition function and its details
+SELECT
+name,
+function_id,
+type,
+type_desc,
+boundary_value_on_right
+FROM sys.partition_functions
+
+--! STEP 2: Creating FILEGROUPS
+ALTER DATABASE SalesDB ADD FILEGROUP FG_2023;
+ALTER DATABASE SalesDB ADD FILEGROUP FG_2024;
+ALTER DATABASE SalesDB ADD FILEGROUP FG_2025;
+ALTER DATABASE SalesDB ADD FILEGROUP FG_2026;
+
+-- To remove a filegroup, you can use the following command:
+-- ALTER DATABASE SalesDB REMOVE FILEGROUP FG_2023;
+
+-- Query list of all existing filegroups in the database
+SELECT * FROM sys.filegroups
+WHERE type = 'FG' -- This will give you the list of all the filegroups in the database. The type 'FG' indicates that it is a filegroup.
+-- PRIMARY filegroup is the default filegroup where all the data is stored if you don't specify any filegroup while creating a table or index. You can have multiple filegroups in a database, and you can use them to organize your data and improve performance.
+
+-- STEP 3: Add .ndf files to each filegroups
+
+ALTER DATABASE SalesDB ADD FILE (NAME = 'P_2023', FILENAME = '/var/opt/mssql/data/P_2023.ndf') TO FILEGROUP FG_2023;
+ALTER DATABASE SalesDB ADD FILE (NAME = 'P_2024', FILENAME = '/var/opt/mssql/data/P_2024.ndf') TO FILEGROUP FG_2024;
+ALTER DATABASE SalesDB ADD FILE (NAME = 'P_2025', FILENAME = '/var/opt/mssql/data/P_2025.ndf') TO FILEGROUP FG_2025;
+ALTER DATABASE SalesDB ADD FILE (NAME = 'P_2026', FILENAME = '/var/opt/mssql/data/P_2026.ndf') TO FILEGROUP FG_2026;
+
+
+SELECT
+fg.name AS FilegroupName,
+mf.name AS LogicalFileName,
+mf.physical_name AS PhysicalFilePath,
+mf.size / 128 AS SizeInMB
+FROM sys.filegroups fg
+JOIN sys.master_files mf ON fg.data_space_id = mf.data_space_id
+WHERE mf.database_id = DB_ID('SalesDB')
+
+-- STEP 4: Creating PARTITION SCHEME
+CREATE PARTITION SCHEME PartitionSchemeByYear
+AS PARTITION PartitionByYear TO (FG_2023, FG_2024, FG_2025, FG_2026)
+-- Sort the Filegroups according to the result of the Function's Partitions.
+-- 3 boundaries in the function means 4 partitions, so we need to specify 4 filegroups in the scheme.
+
+-- Query to check the partition scheme and its details
+SELECT
+ps.name AS PartitionSchemeName,
+pf.name AS PartitionFunctionName, 
+ds.destination_id AS PartitionNumber, 
+fg.name AS FilegroupName
+FROM sys.partition_schemes ps
+JOIN sys.partition_functions pf ON ps.function_id = pf.function_id
+JOIN sys.destination_data_spaces ds ON ps.data_space_id = ds.partition_scheme_id
+JOIN sys.filegroups fg ON ds.data_space_id = fg.data_space_id
+
+-- STEP 5: Creating a Partitioned Table
+CREATE TABLE SalesDB.Sales.PartitionedOrders
+(
+    OrderID INT,
+    OrderDate DATE,
+    Sales INT
+) ON PartitionSchemeByYear(OrderDate)
+
+-- STEP 6: Inserting Data into the Partitioned Table
+INSERT INTO SalesDB.Sales.PartitionedOrders (OrderID, OrderDate, Sales)
+VALUES
+(1, '2023-01-15', 100),
+(2, '2023-05-20', 200),
+(3, '2024-03-10', 150),
+(4, '2024-07-25', 300),
+(5, '2025-02-05', 250),
+(6, '2025-09-15', 400),
+(7, '2026-04-30', 350)
+
+SELECT * FROM SalesDB.Sales.PartitionedOrders
+
+-- Query to check the partition details of the table
+SELECT
+p.partition_number AS PartitionNumber,
+f.name AS PartitionFilegroup,
+p.rows AS NumberOfRows
+FROM sys.partitions p
+JOIN sys.destination_data_spaces dds ON p.partition_number = dds.destination_id
+JOIN sys.filegroups f ON dds.data_space_id = f.data_space_id
+WHERE OBJECT_NAME(p.object_id) = 'PartitionedOrders';
 
 
 
