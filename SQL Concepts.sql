@@ -3729,76 +3729,521 @@ JOIN sys.destination_data_spaces dds ON p.partition_number = dds.destination_id
 JOIN sys.filegroups f ON dds.data_space_id = f.data_space_id
 WHERE OBJECT_NAME(p.object_id) = 'PartitionedOrders';
 
+SELECT * FROM SalesDB.Sales.PartitionedOrders
+Where OrderDate = '2024-03-10'
 
+SELECT * FROM SalesDB.Sales.NoPartition
+Where OrderDate = '2024-03-10'
 
+-- Explanation: The first query will use partition elimination and only scan the partition that contains the data for '2024-03-10', while the second query will scan the entire table since it is not partitioned. This demonstrates the performance benefits of partitioning for large datasets.
 
 
 
+-- SQL Performance Optimization Best Practices
 
+------------------------------------------------------------
+-- Golden Rule: Always Test Using Execution Plans
+------------------------------------------------------------
 
+-- SQL Optimizer behaves differently based on table size.
 
+-- Small/Medium Tables:
+-- - Performance differences may not be noticeable.
 
+-- Large Tables (Millions/Billions of rows):
+-- - Query optimization has a major impact.
 
+-- Rule:
+-- Always compare queries using Execution Plans.
 
+-- If optimized query improves performance:
+-- -> Use optimized query.
 
+-- If no performance gain:
+-- -> Choose the query that is easier to read and maintain.
 
 
+-- ============================================================
+-- QUERY WRITING BEST PRACTICES
+-- ============================================================
 
+-- Tip 1: Select Only Required Columns
+------------------------------------------------------------
 
+-- Bad:
+SELECT *
+FROM Sales.Customers;
 
+-- Problem:
+-- - Reads unnecessary columns
+-- - Transfers extra data
+-- - Slows query performance
 
+-- Good:
+SELECT CustomerID, FirstName
+FROM Sales.Customers;
 
+-- Fetch only required data.
 
+------------------------------------------------------------
+-- Tip 2: Avoid Unnecessary DISTINCT and ORDER BY
+------------------------------------------------------------
 
+-- DISTINCT:
+-- - Removes duplicates
+-- - Requires extra processing
 
+-- ORDER BY:
+-- - Sorts data
+-- - Expensive operation
 
+-- Bad:
+SELECT DISTINCT *
+FROM Sales.Orders
+ORDER BY OrderDate;
 
+-- Good:
+-- Use only when required.
 
+------------------------------------------------------------
+-- Tip 3: Limit Rows During Data Exploration
+------------------------------------------------------------
 
+-- Bad:
+SELECT *
+FROM Sales.Orders;
 
+-- Problem:
+-- Reads millions of rows unnecessarily.
 
+-- Good:
+SELECT TOP 10 *
+FROM Sales.Orders;
 
+-- Fetch only sample data while exploring.
 
+============================================================
+-- FILTERING OPTIMIZATION
+============================================================
 
+-- Tip 4: Index Frequently Filtered Columns
+------------------------------------------------------------
+-- If a column is frequently used in WHERE clause:
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+SELECT *
+FROM Sales.Orders
+WHERE OrderStatus = 'Delivered';
+
+-- Create:
+-- Non-clustered index on Status
+
+-- Benefit:
+-- Faster filtering using index seek.
+
+------------------------------------------------------------
+-- Tip 5: Avoid Functions on Columns in WHERE Clause
+------------------------------------------------------------
+-- Bad:
+SELECT *
+FROM Sales.Orders
+WHERE LOWER(OrderStatus) = 'delivered';
+-- Problem:
+-- SQL cannot use existing index.
+
+-- Good:
+SELECT *
+FROM Sales.Orders
+WHERE OrderStatus = 'Delivered';
+-- Avoid transforming indexed columns.
+
+
+------------------------------------------------------------
+
+-- Example:
+-- Bad:
+SELECT * FROM Sales.Customers
+WHERE SUBSTRING(FirstName,1,1) = 'A'
+-- Does not use index on FirstName.
+
+-- Good:
+WHERE FirstName LIKE 'A%'
+-- Allows index usage.
+
+------------------------------------------------------------
+-- Date Example:
+-- Bad:
+SELECT * FROM Sales.Orders
+WHERE YEAR(OrderDate) = 2025
+-- Does not use index on OrderDate.
+-- Avoid functions on indexed columns.
+
+-- Good:
+SELECT * FROM Sales.Orders
+WHERE OrderDate BETWEEN '2025-01-01' AND '2025-12-31'
+
+------------------------------------------------------------
+-- Tip 6: Avoid Leading Wildcards
+------------------------------------------------------------
+
+-- Bad:
+SELECT *
+FROM Sales.Customers
+WHERE LastName LIKE '%Gold'
+-- Problem:
+-- SQL cannot use index.
+-- Index can be used.
+
+-- Good:
+SELECT *
+FROM Sales.Customers
+WHERE LastName LIKE 'Gold%'
+
+------------------------------------------------------------
+-- Tip 7: Use IN Instead of Multiple OR Conditions
+------------------------------------------------------------
+
+-- Bad:
+SELECT * FROM Sales.Customers
+WHERE CustomerID = 1
+OR CustomerID = 2
+OR CustomerID = 3
+
+-- Good:
+SELECT * FROM Sales.Customers
+WHERE CustomerID IN (1,2,3)
+-- Benefits:
+-- - Cleaner query
+-- - Better optimization
+
+============================================================
+-- AGGREGATION OPTIMIZATION
+============================================================
+-- Tip 8: Use Columnstore Index for Large Aggregations
+------------------------------------------------------------
+
+-- Best for:
+-- - Fact tables
+-- - Data warehouse
+-- - Millions of rows
+
+-- Benefits:
+-- - Data compression
+-- - Faster scans
+-- - Faster aggregations
+
+------------------------------------------------------------
+-- Tip 9: Pre-Aggregate Data for Reporting
+------------------------------------------------------------
+
+-- Problem:
+-- Large aggregation query takes minutes.
+-- Solution:
+-- Store aggregated results:
+
+SELECT 
+CustomerID,
+COUNT(*) AS OrderCount
+INTO Sales.SalesSummary
+FROM Sales.Orders
+GROUP BY CustomerID;
+
+-- Reporting queries become faster.
+-- Remember:
+-- Refresh summary tables when new data arrives.
+
+============================================================
+-- JOIN OPTIMIZATION
+============================================================
+-- Tip 10: Prefer ANSI JOIN Syntax
+------------------------------------------------------------
+
+-- Bad:
+SELECT * 
+FROM Sales.Customers C, Sales.Orders O
+WHERE C.CustomerID = O.CustomerID
+
+-- Good:
+SELECT *
+FROM Sales.Customers C
+INNER JOIN Sales.Orders O
+ON C.CustomerID = O.CustomerID
+-- Benefits:
+-- - Easier to read
+-- - Easier optimization
+
+------------------------------------------------------------
+-- Tip 11: Index Columns Used in JOIN Conditions
+------------------------------------------------------------
+
+-- Example:
+
+--Customers.CustomerID
+-- Orders.CustomerID
+-- Both columns should have indexes.
+-- Without index:
+-- Full table scan happens.
+
+------------------------------------------------------------
+-- Tip 12: Filter Data Before Joining Large Tables
+------------------------------------------------------------
+
+-- Small Tables:
+-- Normal JOIN + WHERE is acceptable.
+
+-- Large Tables:
+-- Prepare data first using CTE/Subquery.
+
+Example:
+
+WITH FilteredOrders AS
+(
+    SELECT *
+    FROM Sales.Orders
+    WHERE OrderStatus='Delivered'
+)
+SELECT *
+FROM Sales.Customers C
+JOIN FilteredOrders O
+ON C.CustomerID = O.CustomerID;
+-- Reduce rows before joining.
+
+------------------------------------------------------------
+-- Tip 13: Aggregate Before Joining Large Tables
+------------------------------------------------------------
+
+-- Bad:
+--JOIN tables first then GROUP BY
+
+-- Better:
+-- 1. Aggregate data first
+-- 2. Join aggregated result
+
+
+Example:
+
+WITH OrderSummary AS
+(
+    SELECT 
+    CustomerID,
+    COUNT(*) OrderCount
+    FROM Sales.Orders
+    GROUP BY CustomerID
+)
+SELECT *
+FROM Sales.Customers c
+JOIN OrderSummary o
+ON c.CustomerID = o.CustomerID;
+-- Reduces data movement.
+
+------------------------------------------------------------
+-- Tip 14: Avoid Correlated Subqueries
+------------------------------------------------------------
+
+-- Bad:
+-- Runs aggregation for every row.
+-- Causes repeated scans.
+
+-- Better:
+-- Use:
+-- - CTE
+-- - Window Functions
+-- - Pre-aggregation
+
+------------------------------------------------------------
+-- Tip 15: Avoid OR Conditions in JOINs
+------------------------------------------------------------
+
+-- Bad:
+-- ON A.ID = B.ID
+-- OR A.ID = B.SalesPersonID
+-- Problem:
+-- - Poor index usage
+-- - Slower joins
+
+-- Better:
+-- Query 1 JOIN
+-- UNION
+-- Query 2 JOIN
+-- Improves performance on large tables.
+
+------------------------------------------------------------
+-- Tip 16: Check Join Type in Execution Plan
+------------------------------------------------------------
+
+-- Nested Loop:
+-- Good for small tables.
+
+-- Hash Join:
+-- Better for large tables.
+
+-- If SQL chooses wrong join:
+-- OPTION(HASH JOIN)
+-- Force better join strategy.
+
+============================================================
+-- UNION OPTIMIZATION
+============================================================
+-- Tip 17: Use UNION ALL Instead of UNION When Possible
+------------------------------------------------------------
+
+-- UNION:
+-- - Removes duplicates
+-- - Extra processing
+
+-- UNION ALL:
+-- - Directly combines results
+-- - Faster
+
+-- Use UNION ALL when:
+-- - Duplicates are acceptable
+-- - Duplicates do not exist
+
+------------------------------------------------------------
+-- Tip 18: For Very Large Tables Use UNION ALL + DISTINCT
+------------------------------------------------------------
+
+-- Instead of: UNION
+
+
+-- Use:
+SELECT DISTINCT *
+FROM
+(
+SELECT 1 AS num
+UNION ALL
+SELECT 2
+) AS CombinedResults 
+-- Test execution plan before choosing.
+
+============================================================
+-- TABLE DESIGN (DDL) BEST PRACTICES
+============================================================
+-- Tip 19: Avoid VARCHAR/TEXT When Possible
+------------------------------------------------------------
+
+-- Problems:
+-- - More storage
+-- - Expensive sorting
+-- - Expensive indexing
+
+-- Use correct data types.
+/*
+Example:
+Bad:
+Birthday VARCHAR(50)
+Good:
+Birthday DATE
+
+Bad:
+Score VARCHAR(20)
+Good:
+Score INT
+*/
+
+------------------------------------------------------------
+-- Tip 20: Avoid VARCHAR(MAX) or Oversized Lengths
+------------------------------------------------------------
+
+-- Bad:
+-- Name VARCHAR(MAX)
+
+-- Good:
+-- Name VARCHAR(50)
+-- Benefits:
+-- - Smaller indexes
+-- - Better performance
+
+------------------------------------------------------------
+-- Tip 21: Use NOT NULL Constraints
+------------------------------------------------------------
+
+-- Benefits:
+-- - Better data integrity
+-- - Better indexes
+-- - Less filtering logic
+
+------------------------------------------------------------
+-- Tip 22: Every Table Should Have Clustered Primary Key
+------------------------------------------------------------
+
+-- Benefits:
+-- - Faster lookups
+-- - Better relationships
+-- - Default clustered index
+
+------------------------------------------------------------
+-- Tip 23: Index Frequently Used Foreign Keys
+------------------------------------------------------------
+
+-- Foreign keys used in:
+-- - JOIN
+-- - Filtering
+-- Create non-clustered indexes when needed.
+
+============================================================
+-- INDEX MAINTENANCE
+============================================================
+-- Tip 24: Avoid Over-Indexing
+------------------------------------------------------------
+
+-- Too many indexes:
+-- - Slow INSERT/UPDATE/DELETE
+-- - Consume storage
+-- - Confuse optimizer
+
+------------------------------------------------------------
+-- Tip 25: Remove Unused Indexes
+------------------------------------------------------------
+
+-- Monitor index usage.
+-- Drop indexes that are never used.
+
+------------------------------------------------------------
+-- Tip 26: Update Statistics Regularly
+------------------------------------------------------------
+
+-- Outdated statistics:
+-- -> Bad execution plans
+-- -> Slow queries
+
+------------------------------------------------------------
+-- Tip 27: Rebuild/Reorganize Indexes
+------------------------------------------------------------
+
+-- Prevent:
+-- - Fragmentation
+-- - Wasted space
+-- - Poor performance
+
+============================================================
+-- LARGE TABLE OPTIMIZATION
+============================================================
+-- Tip 28: Use Partitioning for Huge Tables
+------------------------------------------------------------
+
+-- Helps:
+-- - Faster reads
+-- - Faster writes
+
+-- Combine:
+-- Partitioning + Columnstore Index
+
+-- Best for:
+-- Large warehouse tables.
+
+============================================================
+-- FINAL RULE
+============================================================
+
+-- SQL Optimization is not only about indexes.
+
+-- Focus on:
+-- 1. Writing readable queries
+-- 2. Correct table design
+-- 3. Proper indexing
+-- 4. Testing with execution plans
+
+-- Measure → Test → Optimize
 
 
 
