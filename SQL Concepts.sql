@@ -4246,6 +4246,289 @@ Score INT
 -- Measure → Test → Optimize
 
 
+-- DATA ARCHITECTURE DESIGN
+
+-- Data Architecture = Blueprint of a Data System
+--
+-- Similar to building a house:
+-- Architect designs structure before construction.
+--
+-- Data Architect defines:
+-- - How data flows
+-- - How data is stored
+-- - How data is accessed
+-- - Scalability
+-- - Maintainability
+
+
+
+============================================================
+-- DATA ARCHITECTURE APPROACHES
+============================================================
+
+============================================================
+-- STEP 1: CHOOSE DATA ARCHITECTURE APPROACH
+============================================================
+
+-- Approach 1: Data Warehouse
+------------------------------------------------------------
+-- Best for:
+-- - Structured data only
+-- - Reporting
+-- - Business Intelligence
+
+-- Characteristics:
+-- - Highly organized
+-- - Optimized for analytics
+
+------------------------------------------------------------
+-- Approach 2: Data Lake
+------------------------------------------------------------
+
+-- Stores:
+-- - Structured data
+-- - Semi-structured data
+-- - Unstructured data
+
+-- Examples:
+-- - Tables
+-- - Logs
+-- - Images
+-- - Videos
+
+-- Best for:
+-- - Machine Learning
+-- - Advanced Analytics
+
+-- Problem:
+-- Without governance:
+-- Data Lake -> Data Swamp
+
+------------------------------------------------------------
+-- Approach 3: Data Lakehouse
+------------------------------------------------------------
+
+-- Combination of:
+
+-- Data Lake:
+-- - Flexibility
+-- - Multiple data types
+
+-- Data Warehouse:
+-- - Organization
+-- - Structure
+
+-- Modern architecture:
+-- Supports:
+-- - BI
+-- - Analytics
+-- - ML
+-- - AI
+
+------------------------------------------------------------
+-- Approach 4: Data Mesh
+------------------------------------------------------------
+
+-- Traditional:
+-- Centralized data platform
+
+-- Data Mesh:
+-- Decentralized architecture
+
+-- Each business domain:
+-- - Owns data
+-- - Builds data products
+-- - Shares data with others
+
+-- Goal:
+-- Avoid centralized bottleneck
+
+============================================================
+-- DATA WAREHOUSE DESIGN APPROACHES
+============================================================
+-- Approach 1: Inmon Architecture
+------------------------------------------------------------
+-- Layers:
+
+-- 1. Staging Layer
+-- - Raw data landing area
+-- - Data from source systems
+
+-- 2. Enterprise Data Warehouse (EDW)
+-- - Centralized warehouse
+-- - Uses normalized model (3NF)
+-- - Integrates multiple sources
+
+-- 3. Data Marts
+-- - Subject-specific data
+-- - Customer, Sales, Products
+-- - Used for reporting
+
+-- 4. BI Tools
+-- Example:
+-- Power BI / Tableau
+
+-- Flow:
+
+Sources
+   |
+Staging
+   |
+Enterprise Data Warehouse
+   |
+Data Marts
+   |
+Reporting
+
+------------------------------------------------------------
+-- Approach 2: Simple Data Warehouse Approach
+------------------------------------------------------------
+
+-- Removes Enterprise Data Warehouse layer.
+-- Flow:
+Sources
+   |
+Staging
+   |
+Data Marts
+   |
+Reporting
+
+-- Advantage:
+-- - Faster development
+
+-- Disadvantage:
+-- - Data duplication
+-- - Repeated transformations
+-- - Difficult maintenance
+
+-- Trade-off:
+-- Speed vs Data consistency
+
+------------------------------------------------------------
+-- Approach 3: Data Vault Architecture
+------------------------------------------------------------
+-- Similar to Inmon but adds stronger standards.
+
+-- Layers:
+-- 1. Staging
+-- Raw source data
+
+-- 2. Data Vault
+-- Raw Vault:
+-- - Stores original data
+-- - Historical tracking
+-- Business Vault:
+-- - Business rules
+-- - Transformations
+
+-- 3. Data Marts
+-- Reporting layer
+
+-- Benefit:
+-- - Scalable
+-- - Auditable
+-- - Strong governance
+
+------------------------------------------------------------
+-- Approach 4: Medallion Architecture
+------------------------------------------------------------
+-- Modern and commonly used approach.
+
+-- Three Layers:
+------------------------------------------------------------
+-- Bronze Layer
+------------------------------------------------------------
+
+-- Similar to staging layer.
+-- Stores:
+-- - Raw data
+-- - Original format
+
+-- Benefits:
+-- - Traceability
+-- - Debugging
+-- - Data recovery
+
+------------------------------------------------------------
+-- Silver Layer
+------------------------------------------------------------
+-- Data processing layer.
+
+-- Performs:
+-- - Cleaning
+-- - Standardization
+-- - Transformations
+
+-- Does NOT apply:
+-- Business-specific rules
+
+------------------------------------------------------------
+-- Gold Layer
+------------------------------------------------------------
+-- Business-ready data layer.
+
+-- Contains:
+-- - Reporting datasets
+-- - ML datasets
+-- - AI datasets
+-- - Data products
+
+-- Used by:
+-- - Analysts
+-- - Business teams
+-- - Applications
+
+============================================================
+-- KEY DECISION PROCESS
+============================================================
+
+-- Building Data Architecture:
+
+Step 1:
+-- Choose architecture type:
+-- Data Warehouse
+-- Data Lake
+-- Lakehouse
+-- Data Mesh
+
+Step 2:
+-- If Data Warehouse:
+-- Choose implementation approach:
+
+-- Inmon
+-- Simple
+-- Data Vault
+-- Medallion
+
+Step 3:
+-- Design layers and data flow.
+
+============================================================
+-- PROJECT APPROACH
+============================================================
+
+-- Selected:
+-- Architecture:
+-- Data Warehouse
+
+-- Design Pattern:
+-- Medallion Architecture
+
+-- Layers:
+
+Sources
+   |
+Bronze
+   |
+Silver
+   |
+Gold
+   |
+BI / Analytics / ML
+
+-- Goal:
+-- Build scalable, maintainable, business-ready data platform.
 
 
 
