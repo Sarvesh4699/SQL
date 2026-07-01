@@ -4781,10 +4781,10 @@ Source Systems
 
 -- Separation of concerns = Strong data architecture design
 
+
+-- Parse JSON data in SQL Server using OPENJSON function.
 SELECT *
 FROM OPENJSON('{"order_id":1,"customer":"John","amount":500}')
-
-
 
 SELECT *
 FROM OPENJSON('{"order_id":1,"customer":"John","amount":500}')
@@ -4794,7 +4794,303 @@ WITH (
     amount INT
 );
 
-
 SELECT *
 FROM OPENJSON('{"a":1,"b":2}')
 WHERE value > 1
+
+
+
+============================================================
+-- WHAT IS DATA MODELING?
+============================================================
+
+-- Data Modeling:
+-- Process of transforming raw data into organized and meaningful structures.
+
+
+-- Converts messy source data into:
+
+-- Business Objects:
+-- - Customers
+-- - Orders
+-- - Products
+
+-- Defines:
+-- - Entities
+-- - Attributes
+-- - Relationships
+
+-- Result:
+-- Logical Data Model
+
+============================================================
+-- DATA MODELING LEVELS
+============================================================
+
+-- 1. Conceptual Data Model
+------------------------------------------------------------
+
+-- Focus:
+-- High-level business view
+
+-- Contains:
+-- - Entities only
+-- - Relationships
+
+-- Example:
+Customers ---- Orders ---- Products
+
+-- Does NOT contain:
+-- - Columns
+-- - Data types
+-- - Technical details
+
+-- Purpose:
+-- Understand big picture.
+
+------------------------------------------------------------
+-- 2. Logical Data Model
+------------------------------------------------------------
+
+-- Adds more details.
+-- Contains:
+Customer:
+- Customer_ID
+- First_Name
+- Last_Name
+
+-- Defines:
+-- - Attributes
+-- - Primary Keys
+-- - Relationships
+
+-- Does NOT define:
+-- - Data types
+-- - Database implementation
+
+-- Purpose:
+-- Define what data is needed.
+
+------------------------------------------------------------
+-- 3. Physical Data Model
+------------------------------------------------------------
+
+-- Database implementation design.
+-- Contains:
+-- Column details:
+-- - Data types
+-- - Lengths
+-- - Constraints
+-- - Indexes
+
+-- Purpose:
+-- Ready for database creation.
+
+------------------------------------------------------------
+-- Common Practice:
+-- Usually create:
+-- Conceptual Model
+-- Logical Model
+
+-- Physical model requires more effort
+-- and many tools generate it automatically.
+
+============================================================
+-- ANALYTICAL DATA MODELS
+============================================================
+
+-- Data warehouses use special models optimized for:
+-- - Reporting
+-- - BI
+-- - Analytics
+
+
+-- Main Models:
+-- 1. Star Schema
+-- 2. Snowflake Schema
+
+
+============================================================
+-- STAR SCHEMA
+============================================================
+
+-- Structure:
+
+              Dimension
+                  |
+Dimension -- Fact Table -- Dimension
+                  |
+              Dimension
+
+-- Contains:
+-- Central Fact Table:
+-- - Transactions
+-- - Events
+-- - Measurements
+
+-- Dimension Tables:
+-- - Descriptive information
+
+-- Example:
+
+Fact Sales:
+- Sales Amount
+- Quantity
+- Date_ID
+- Product_ID
+
+Dimension Product:
+- Product Name
+- Category
+
+-- Why Star?
+-- Fact table in center
+-- Dimensions around it create star shape.
+
+-- Advantages:
+-- - Simple
+-- - Easy to query
+-- - Fast for analytics
+-- - Perfect for BI tools
+
+
+-- Disadvantage:
+-- - More duplicate data
+-- - Larger dimensions
+
+============================================================
+-- SNOWFLAKE SCHEMA
+============================================================
+
+-- Similar to Star Schema.
+-- Difference:
+-- Dimensions are split into smaller tables.
+
+Example:
+Product Dimension
+becomes:
+
+Product
+ |
+Category
+ |
+Subcategory
+
+
+-- Advantages:
+-- - Less redundancy
+-- - Better storage optimization
+
+-- Disadvantages:
+-- - More complex
+-- - More joins
+-- - Harder queries
+
+============================================================
+-- STAR vs SNOWFLAKE
+============================================================
+
+-- Star Schema:
+-- Simple
+-- Faster querying
+-- Business friendly
+-- Best for reporting
+
+-- Snowflake:
+-- More normalized
+-- Saves storage
+-- More complex
+
+-- Project Choice:
+-- Use Star Schema
+
+-- Reason:
+-- - Common in BI
+-- - Easy for analysts
+-- - Works well with Power BI
+
+============================================================
+-- FACT VS DIMENSION TABLES
+============================================================
+
+-- DIMENSION TABLE
+------------------------------------------------------------
+
+-- Purpose:
+-- Store descriptive information.
+
+-- Answers:
+-- Who?
+-- What?
+-- Where?
+
+-- Examples:
+Customer Dimension:
+Customer_ID
+Customer_Name
+Country
+
+Product Dimension:
+Product_ID
+Product_Name
+Category
+
+-- Contains:
+-- Categories and descriptions.
+
+------------------------------------------------------------
+-- FACT TABLE
+------------------------------------------------------------
+
+-- Purpose:
+-- Store business events and measurements.
+
+-- Answers:
+-- How much?
+-- How many?
+
+-- Contains:
+-- 1. Foreign Keys
+-- Links to dimensions
+
+-- 2. Date Information
+-- When event happened
+
+-- 3. Measures
+-- Numeric values
+
+Example:
+
+Sales Fact:
+Customer_ID
+Product_ID
+Date_ID
+Sales_Amount
+Quantity
+
+------------------------------------------------------------
+-- Quick Rule:
+
+-- Dimension:
+-- "Who / What / Where"
+
+-- Fact:
+-- "How much / How many"
+
+============================================================
+-- GOLD LAYER FINAL FLOW
+============================================================
+
+Source Data
+      |
+      v
+Business Objects
+      |
+      v
+Fact + Dimension Design
+      |
+      v
+Star Schema
+      |
+      v
+Reporting / Analytics
