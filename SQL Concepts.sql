@@ -2358,7 +2358,6 @@ BEGIN
         PRINT ('No NULL Scores found')
     END;
 
-
     SELECT
         @firstVar = COUNT(*), -- If you are assigning value to a variable then you cannot have alias for it
         @secondVar = AVG(Score)
@@ -4531,4 +4530,271 @@ BI / Analytics / ML
 -- Build scalable, maintainable, business-ready data platform.
 
 
+--* DATA WAREHOUSE LAYER DESIGN PRINCIPLES
+-- Each layer must have:
+-- - Clear purpose
+-- - Defined object types
+-- - Load method
+-- - Transformations
+-- - Data model
+-- - Target audience
 
+============================================================
+-- BRONZE LAYER
+============================================================
+
+-- Purpose:
+-- Store raw and unprocessed data from source systems.
+
+-- Main Goal:
+-- - Traceability
+-- - Debugging
+-- - Root cause analysis
+
+-- Rules:
+-- - Keep original source data
+-- - Do not modify data
+-- - No transformations
+
+-- Example:
+-- If source data is incorrect:
+-- Investigate original data from Bronze layer.
+
+------------------------------------------------------------
+-- Object Type:
+-- Table
+
+-- Load Method:
+-- Full Load
+-- Example:
+-- TRUNCATE + INSERT
+
+-- Transformations: None
+-- Data remains exactly as received.
+
+-- Data Model:
+-- Maintain source system structure.
+
+-- Example:
+-- Source has 5 tables
+-- Bronze will have same 5 tables.
+
+-- Target Audience:
+-- Data Engineers only
+
+-- Avoid:
+-- Giving raw data access to analysts/business users.
+
+============================================================
+-- SILVER LAYER
+============================================================
+
+-- Purpose:
+-- Store clean and standardized data.
+
+-- Main Goal:
+-- Prepare data for business consumption.
+
+-- Object Type:
+-- Table
+
+-- Load Method:
+-- Full Load
+-- Example:
+-- TRUNCATE + INSERT
+
+------------------------------------------------------------
+
+-- Transformations:
+-- Data Cleansing:
+-- - Remove errors
+-- - Handle missing values
+
+-- Data Standardization:
+-- - Consistent formats
+
+-- Data Normalization:
+-- - Improve structure
+
+-- Derived Columns:
+-- - Create calculated fields
+
+-- Data Enrichment:
+-- - Add additional information
+
+-- Rule:
+-- Focus on technical transformations.
+-- Avoid business-specific rules here.
+
+------------------------------------------------------------
+
+-- Data Model:
+-- Keep source structure.
+
+-- Do not:
+-- - Normalize further
+-- - Denormalize
+-- - Create business models
+
+------------------------------------------------------------
+
+-- Target Audience:
+-- Data Engineers
+-- Data Analysts
+-- Data Scientists
+
+-- Avoid:
+-- Business users accessing Silver directly.
+
+============================================================
+-- GOLD LAYER
+============================================================
+
+-- Purpose:
+-- Business-ready data.
+
+-- Main Goal:
+-- Support:
+-- - Reporting
+-- - Analytics
+-- - BI
+-- - ML
+
+-- Object Type:
+-- Views
+
+-- Why Views?
+-- - Dynamic
+-- - Faster development
+-- - No additional loading process
+
+------------------------------------------------------------
+
+-- Load Method:
+-- No load process.
+
+-- Views always show latest data.
+
+------------------------------------------------------------
+
+-- Transformations:
+-- Business Transformations:
+
+-- Data Integration:
+-- Combine multiple sources
+
+-- Aggregations:
+-- Example:
+-- Total sales by region
+
+-- Business Rules:
+-- Apply organization logic
+
+-- Data Modeling:
+-- Build final analytical model.
+
+------------------------------------------------------------
+
+-- Possible Models:
+
+-- Star Schema
+-- Snowflake Schema
+-- Aggregated Tables/Views
+
+------------------------------------------------------------
+
+-- Target Audience:
+-- Data Analysts
+-- Business Users
+
+-- Purpose:
+-- Easy-to-use business data.
+
+============================================================
+--* SEPARATION OF CONCERNS PRINCIPLE
+============================================================
+
+-- Core Data Architecture Principle:
+
+-- Break complex systems into:
+-- - Smaller independent components
+-- - Each component has one responsibility
+
+-- Important Rule:
+-- Do not duplicate responsibilities.
+
+============================================================
+-- Layer Responsibility Example
+============================================================
+
+-- Bronze:
+-- Data ingestion only
+
+-- NOT: Cleaning and Business logic
+
+------------------------------------------------------------
+-- Silver:
+-- Data quality + standardization
+
+-- NOT: Business transformations
+
+------------------------------------------------------------
+
+-- Gold:
+-- Business logic + analytics models
+
+-- NOT: Data cleansing
+
+------------------------------------------------------------
+
+-- Data Flow Rule:
+Source Systems
+        |
+        v
+    Bronze
+        |
+        v
+    Silver
+        |
+        v
+    Gold
+
+-- Do not skip layers.
+
+============================================================
+-- DATA ARCHITECT DECISION CHECKLIST
+============================================================
+
+-- For every layer define:
+
+-- 1. Purpose
+-- 2. Object Type
+-- 3. Load Method
+-- 4. Transformations
+-- 5. Data Model
+-- 6. Target Audience
+
+-- Final Goal:
+-- Clear responsibilities
+-- Scalable architecture
+-- Easy maintenance
+
+-- Separation of concerns = Strong data architecture design
+
+SELECT *
+FROM OPENJSON('{"order_id":1,"customer":"John","amount":500}')
+
+
+
+SELECT *
+FROM OPENJSON('{"order_id":1,"customer":"John","amount":500}')
+WITH (
+    order_id INT,
+    customer VARCHAR(50),
+    amount INT
+);
+
+
+SELECT *
+FROM OPENJSON('{"a":1,"b":2}')
+WHERE value > 1
