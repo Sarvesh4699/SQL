@@ -547,7 +547,7 @@ it can break your query or can make the result set incorrect, and also it is a g
 
 --*-------------------
 -- * STRING FUNCTIONS
---*-------------------
+--*------------------- 
 
 -- Nested functions --> Using one function inside another function
 --* CONCAT --> Used to concatenate two or more strings into one string
