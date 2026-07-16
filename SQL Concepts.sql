@@ -72,10 +72,12 @@ HAVING SUM(score) > 800
 
 -- SQL TASK
 -- Find the average score for each country considering only customers with a score not equal to O and return only those countries with an average score greater than 430
-SELECT country, AVG(score) from MyDatabase.dbo.customers
+SELECT country, AVG(score) as AvgScore
+from MyDatabase.dbo.customers
 WHERE score != 0
 GROUP BY country
-HAVING AVG(score) > 430
+HAVING AVG(score) > 100
+ORDER BY AvgScore DESC
 
 --*-----------
 -- * DISTINCT
@@ -278,7 +280,7 @@ WHERE NOT score < 500
 -- * RANGE OPERATORS
 --*------------------------
 -- BETWEEN --> Checks if a value falls within a specific range
--- For range you need lower boundary and and upper boundary, everything between these two boundaries will be true and outside these boundaries will be false
+-- For range you need lower boundary and upper boundary, everything between these two boundaries will be true and outside these boundaries will be false
 -- * Boundaries are inclusive (Important)
 
 -- Retrieve all customers whose score falls in the range between 100 and 500
