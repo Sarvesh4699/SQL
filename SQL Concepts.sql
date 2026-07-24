@@ -547,7 +547,7 @@ it can break your query or can make the result set incorrect, and also it is a g
 
 --*-------------------
 -- * STRING FUNCTIONS
---*------------------- 
+--*-------------------
 
 -- Nested functions --> Using one function inside another function
 --* CONCAT --> Used to concatenate two or more strings into one string
@@ -707,7 +707,7 @@ FROM SalesDB.Sales.Customers
 -- When we are joining two tables based on a column that can have NULL values, we need to handle the NULL values properly in the JOIN condition, otherwise we may not get the correct results because NULL values do not match with any value including other NULL values
 /*
 SELECT
-a. year, a.type, a.orders, b.sales
+a.year, a.type, a.orders, b.sales
 FROM Tablel a
 JOIN Table2 b
 ON
@@ -912,7 +912,6 @@ MIN(Sales) AS min_sales
 FROM SalesDB.Sales.Orders
 GROUP BY CustomerID;
 
-
 --*-----------------------
 -- * WINDOW FUNCTIONS
 --*-----------------------
@@ -950,7 +949,7 @@ WINDOW FUNCTIONS are divided into three groups:
 */
 
 /*
-The COUNT FUNCTION excepts every datatype
+The COUNT FUNCTION accepts every datatype
 SUM(), AVG(), MAX(), MIN() functions only accept numeric datatypes, if we try to use them on non-numeric datatypes then it will throw an error
 ROWNUMBER(), RANK(), DENSE_RANK(), CUME_DIST(), PERCENT_RANK() should be empty, they do not accept any arguments
 NTILE() function accepts one argument which is the number of groups to divide the data into, and it should be a positive integer
